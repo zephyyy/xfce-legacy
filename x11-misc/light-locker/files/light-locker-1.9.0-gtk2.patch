@@ -1,0 +1,470 @@
+diff --git a/configure.ac.in b/configure.ac.in
+index f95863a..08c6d14 100644
+--- a/configure.ac.in
++++ b/configure.ac.in
+@@ -45,7 +45,7 @@ GLIB_GSETTINGS
+ 
+ DBUS_REQUIRED_VERSION=0.30
+ GLIB_REQUIRED_VERSION=2.25.6
+-GTK_REQUIRED_VERSION=3.0
++GTK_REQUIRED_VERSION=2.24
+ X11_REQUIRED_VERSION=1.0
+ 
+ AC_CHECK_HEADERS(unistd.h)
+@@ -58,7 +58,7 @@ AC_TYPE_UID_T
+ AC_CHECK_FUNCS([setresuid setenv unsetenv clearenv])
+ PKG_CHECK_MODULES(LIGHT_LOCKER,
+         x11 >= $X11_REQUIRED_VERSION
+-        gtk+-3.0 >= $GTK_REQUIRED_VERSION
++        gtk+-2.0 >= $GTK_REQUIRED_VERSION
+         dbus-glib-1 >= $DBUS_REQUIRED_VERSION)
+ AC_SUBST(LIGHT_LOCKER_CFLAGS)
+ AC_SUBST(LIGHT_LOCKER_LIBS)
+@@ -78,7 +78,7 @@ AC_PATH_PROG(GLIB_GENMARSHAL, glib-genmarshal)
+ 
+ # Optional dependencies for the theme engines
+ 
+-SAVER_MODULES="gthread-2.0 gtk+-3.0 >= $GTK_REQUIRED_VERSION"
++SAVER_MODULES="gthread-2.0 gtk+-2.0 >= $GTK_REQUIRED_VERSION"
+ 
+ PKG_CHECK_MODULES(LIGHT_LOCKER_SAVER, $SAVER_MODULES)
+ AC_SUBST(LIGHT_LOCKER_SAVER_CFLAGS)
+diff --git a/meson.build b/meson.build
+index 2b8d712..68d4b97 100644
+--- a/meson.build
++++ b/meson.build
+@@ -7,7 +7,7 @@ glib_required_version = '2.25.6'
+ glib_dep = dependency('glib-2.0', version: '>='+glib_required_version)
+ gio_dep = dependency('gio-2.0', version: '>='+glib_required_version)
+ gobject_dep = dependency('gobject-2.0', version: '>='+glib_required_version)
+-  gtk_dep = dependency('gtk+-3.0', version: '>=3.0')
++  gtk_dep = dependency('gtk+-2.0', version: '>=2.0')
+ dbus_glib_dep = dependency('dbus-glib-1', version: '>=0.30')
+ x11_dep = dependency('x11', version: '>=1.0')
+ xext_dep = dependency('xext', required: false)
+diff --git a/src/gs-grab-x11.c b/src/gs-grab-x11.c
+index ed0b5fa..4eefa08 100644
+--- a/src/gs-grab-x11.c
++++ b/src/gs-grab-x11.c
+@@ -152,27 +152,7 @@ gs_grab_get_keyboard (GSGrab    *grab,
+ 
+         gs_debug ("Grabbing keyboard widget=%X", (guint32) GDK_WINDOW_XID (window));
+ 
+-        GList *list, *link;
+-        GdkDisplay *display = gdk_window_get_display (window);
+-        GdkDeviceManager *device_manager = gdk_display_get_device_manager (display);
+-        list = gdk_device_manager_list_devices (device_manager, GDK_DEVICE_TYPE_MASTER);
+-
+-        for (link = list; link != NULL; link = g_list_next (link)) {
+-                GdkDevice *device = GDK_DEVICE (link->data);
+-
+-                if (gdk_device_get_source (device) != GDK_SOURCE_KEYBOARD)
+-                        continue;
+-
+-                status = gdk_device_grab (device,
+-                                          window,
+-                                          GDK_OWNERSHIP_NONE,
+-                                          FALSE,
+-                                          GDK_KEY_PRESS_MASK |
+-                                          GDK_KEY_RELEASE_MASK,
+-                                          NULL,
+-                                          GDK_CURRENT_TIME);
+-        }
+-        g_list_free(list);
++        status = gdk_keyboard_grab (window, FALSE, GDK_CURRENT_TIME);
+ 
+         if (status == GDK_GRAB_SUCCESS) {
+                 if (grab->priv->keyboard_grab_window != NULL) {
+@@ -207,27 +187,9 @@ gs_grab_get_mouse (GSGrab    *grab,
+         cursor = gdk_cursor_new (GDK_BLANK_CURSOR);
+ 
+         gs_debug ("Grabbing mouse widget=%X", (guint32) GDK_WINDOW_XID (window));
+-        GList *list, *link;
+-        GdkDisplay *display = gdk_window_get_display (window);
+-        GdkDeviceManager *device_manager = gdk_display_get_device_manager (display);
+-        list = gdk_device_manager_list_devices (device_manager, GDK_DEVICE_TYPE_MASTER);
+-
+-        for (link = list; link != NULL; link = g_list_next (link)) {
+-                GdkDevice *device = GDK_DEVICE (link->data);
+-
+-                if (gdk_device_get_source (device) != GDK_SOURCE_MOUSE)
+-                        continue;
+-
+-                status = gdk_device_grab (device,
+-                                          window,
+-                                          GDK_OWNERSHIP_NONE,
+-                                          FALSE,
+-                                          GDK_KEY_PRESS_MASK |
+-                                          GDK_KEY_RELEASE_MASK,
+-                                          (hide_cursor ? cursor : NULL),
+-                                          GDK_CURRENT_TIME);
+-        }
+-        g_list_free(list);
++        status = gdk_pointer_grab (window, TRUE, 0, NULL,
++                                   (hide_cursor ? cursor : NULL),
++                                   GDK_CURRENT_TIME);
+ 
+         if (status == GDK_GRAB_SUCCESS) {
+                 if (grab->priv->mouse_grab_window != NULL) {
+@@ -243,7 +205,7 @@ gs_grab_get_mouse (GSGrab    *grab,
+                 grab->priv->mouse_hide_cursor = hide_cursor;
+         }
+ 
+-        g_object_unref (cursor);
++        gdk_cursor_unref (cursor);
+ 
+         return status;
+ }
+@@ -264,20 +226,7 @@ gs_grab_release_keyboard (GSGrab *grab)
+ {
+         gs_debug ("Ungrabbing keyboard");
+ 
+-        GList *list, *link;
+-        GdkDisplay *display = gdk_display_get_default ();
+-        GdkDeviceManager *device_manager = gdk_display_get_device_manager (display);
+-        list = gdk_device_manager_list_devices (device_manager, GDK_DEVICE_TYPE_MASTER);
+-
+-        for (link = list; link != NULL; link = g_list_next (link)) {
+-                GdkDevice *device = GDK_DEVICE (link->data);
+-
+-                if (gdk_device_get_source (device) != GDK_SOURCE_KEYBOARD)
+-                        continue;
+-
+-                gdk_device_ungrab(device, GDK_CURRENT_TIME);
+-        }
+-        g_list_free(list);
++        gdk_keyboard_ungrab (GDK_CURRENT_TIME);
+ 
+         gs_grab_keyboard_reset (grab);
+ 
+@@ -301,20 +250,7 @@ gs_grab_release_mouse (GSGrab *grab)
+ {
+         gs_debug ("Ungrabbing pointer");
+ 
+-        GList *list, *link;
+-        GdkDisplay *display = gdk_display_get_default ();
+-        GdkDeviceManager *device_manager = gdk_display_get_device_manager (display);
+-        list = gdk_device_manager_list_devices (device_manager, GDK_DEVICE_TYPE_MASTER);
+-
+-        for (link = list; link != NULL; link = g_list_next (link)) {
+-                GdkDevice *device = GDK_DEVICE (link->data);
+-
+-                if (gdk_device_get_source (device) != GDK_SOURCE_MOUSE)
+-                        continue;
+-
+-                gdk_device_ungrab(device, GDK_CURRENT_TIME);
+-        }
+-        g_list_free(list);
++        gdk_pointer_ungrab (GDK_CURRENT_TIME);
+ 
+         gs_grab_mouse_reset (grab);
+ 
+@@ -334,21 +270,9 @@ gs_grab_move_mouse (GSGrab    *grab,
+ 
+         /* if the pointer is not grabbed and we have a
+            mouse_grab_window defined then we lost the grab */
+-        GList *list, *link;
+-        GdkDisplay *display = gdk_display_get_default ();
+-        GdkDeviceManager *device_manager = gdk_display_get_device_manager (display);
+-        list = gdk_device_manager_list_devices (device_manager, GDK_DEVICE_TYPE_MASTER);
+-        for (link = list; link != NULL; link = g_list_next (link)) {
+-                GdkDevice *device = GDK_DEVICE (link->data);
+-
+-                if (gdk_device_get_source (device) != GDK_SOURCE_MOUSE)
+-                        continue;
+-
+-                if (! gdk_display_device_is_grabbed(display, device)) {
+-                        gs_grab_mouse_reset (grab);
+-                }
++        if (!gdk_pointer_is_grabbed ()) {
++                gs_grab_mouse_reset (grab);
+         }
+-        g_list_free(list);
+ 
+         if (grab->priv->mouse_grab_window == window) {
+                 gs_debug ("Window %X is already grabbed, skipping",
+@@ -469,7 +393,7 @@ gs_grab_nuke_focus (void)
+ 
+         XSetInputFocus (GDK_DISPLAY_XDISPLAY (gdk_display_get_default ()), None, RevertToNone, CurrentTime);
+ 
+-        gdk_error_trap_pop_ignored ();
++        gdk_error_trap_pop ();
+ }
+ 
+ void
+@@ -615,10 +539,7 @@ gs_grab_grab_root (GSGrab  *grab,
+         gs_debug ("Grabbing the root window");
+ 
+         display = gdk_display_get_default ();
+-        GdkDeviceManager *device_manager = gdk_display_get_device_manager (display);
+-        GdkDevice *pointer = gdk_device_manager_get_client_pointer (device_manager);
+-        gint x = -1, y = -1;
+-        gdk_device_get_position (pointer, &screen, &x, &y);
++        gdk_display_get_pointer (display, &screen, NULL, NULL, NULL);
+         root = gdk_screen_get_root_window (screen);
+ 
+         res = gs_grab_grab_window (grab, root, screen, hide_cursor);
+diff --git a/src/gs-listener-dbus.c b/src/gs-listener-dbus.c
+index 044a2bf..28d2c8a 100644
+--- a/src/gs-listener-dbus.c
++++ b/src/gs-listener-dbus.c
+@@ -35,7 +35,7 @@
+ 
+ #ifdef HAVE_MIT_SAVER_EXTENSION
+ #include <gtk/gtk.h>
+-#include <gtk/gtkx.h>
++#include <gdk/gdkx.h>
+ #include <X11/extensions/scrnsaver.h>
+ #endif
+ 
+diff --git a/src/gs-listener-x11.c b/src/gs-listener-x11.c
+index 560b1a4..9c33006 100644
+--- a/src/gs-listener-x11.c
++++ b/src/gs-listener-x11.c
+@@ -29,7 +29,7 @@
+ 
+ #include <glib/gi18n.h>
+ #include <gtk/gtk.h>
+-#include <gtk/gtkx.h>
++#include <gdk/gdkx.h>
+ 
+ #ifdef HAVE_MIT_SAVER_EXTENSION
+ #include <X11/extensions/scrnsaver.h>
+@@ -170,7 +170,7 @@ gs_listener_x11_acquire (GSListenerX11 *listener)
+                 gs_debug ("ScreenSaverExtension not found");
+         }
+ 
+-        gdk_error_trap_pop_ignored ();
++        gdk_error_trap_pop ();
+ #endif
+ 
+         gdk_window_add_filter (NULL, (GdkFilterFunc)xroot_filter, listener);
+@@ -190,7 +190,7 @@ gs_listener_x11_simulate_activity (GSListenerX11 *listener)
+ #ifdef HAVE_DPMS_EXTENSION
+         DPMSForceLevel (GDK_DISPLAY_XDISPLAY (display), DPMSModeOn);
+ #endif
+-        gdk_error_trap_pop_ignored ();
++        gdk_error_trap_pop ();
+ }
+ 
+ gboolean
+@@ -210,7 +210,7 @@ gs_listener_x11_force_blanking (GSListenerX11 *listener,
+                 DPMSForceLevel (GDK_DISPLAY_XDISPLAY (display), DPMSModeOn);
+ #endif
+         }
+-        gdk_error_trap_pop_ignored ();
++        gdk_error_trap_pop ();
+         /* TODO: what should the return value be? */
+         return active;
+ }
+@@ -227,7 +227,7 @@ gs_listener_x11_inhibit (GSListenerX11 *listener,
+         gdk_error_trap_push ();
+         XScreenSaverSuspend (GDK_DISPLAY_XDISPLAY (display), active);
+ 
+-        gdk_error_trap_pop_ignored ();
++        gdk_error_trap_pop ();
+ #endif
+ }
+ 
+@@ -251,7 +251,7 @@ gs_listener_x11_idle_time (GSListenerX11 *listener)
+         } else {
+                 gs_debug ("ScreenSaverExtension not found");
+         }
+-        gdk_error_trap_pop_ignored ();
++        gdk_error_trap_pop ();
+ #endif
+         return secs;
+ }
+diff --git a/src/gs-manager.c b/src/gs-manager.c
+index fdc7af3..f52308e 100644
+--- a/src/gs-manager.c
++++ b/src/gs-manager.c
+@@ -188,9 +188,7 @@ manager_maybe_grab_window (GSManager *manager,
+         gboolean    grabbed;
+ 
+         display = gdk_display_get_default ();
+-        GdkDeviceManager *device_manager = gdk_display_get_device_manager (display);
+-        GdkDevice *pointer = gdk_device_manager_get_client_pointer (device_manager);
+-        gdk_device_get_position (pointer, &screen, &x, &y);
++        gdk_display_get_pointer (display, &screen, &x, &y, NULL);
+         monitor = gdk_screen_get_monitor_at_point (screen, x, y);
+ 
+         gdk_flush ();
+@@ -248,13 +246,23 @@ content_draw_cb (GtkWidget *widget,
+                 content_draw (widget, cr);
+ }
+ 
++static void
++content_expose_cb (GtkWidget *widget,
++                   GdkEvent  *event,
++                   GSManager *manager)
++{
++        cairo_t *cr = gdk_cairo_create (gtk_widget_get_window (widget));
++        content_draw_cb (widget, cr, manager);
++        cairo_destroy (cr);
++}
++
+ static void
+ disconnect_window_signals (GSManager *manager,
+                            GSWindow  *window)
+ {
+         GtkWidget *drawing_area = gs_window_get_drawing_area (window);
+ 
+-        g_signal_handlers_disconnect_by_func (drawing_area, content_draw_cb, manager);
++        g_signal_handlers_disconnect_by_func (drawing_area, content_expose_cb, manager);
+ 
+         g_signal_handlers_disconnect_by_func (window, window_map_event_cb, manager);
+         g_signal_handlers_disconnect_by_func (window, window_grab_broken_cb, manager);
+@@ -274,8 +282,8 @@ connect_window_signals (GSManager *manager,
+ {
+         GtkWidget *drawing_area = gs_window_get_drawing_area (window);
+ 
+-        g_signal_connect_object (drawing_area, "draw",
+-                                 G_CALLBACK (content_draw_cb), manager, 0);
++        g_signal_connect_object (drawing_area, "expose-event",
++                                 G_CALLBACK (content_expose_cb), manager, 0);
+ 
+         g_signal_connect_object (window, "destroy",
+                                  G_CALLBACK (window_destroyed_cb), manager, 0);
+diff --git a/src/gs-window-x11.c b/src/gs-window-x11.c
+index 21e5bbc..5e0ba7d 100644
+--- a/src/gs-window-x11.c
++++ b/src/gs-window-x11.c
+@@ -30,7 +30,7 @@
+ 
+ #include <glib/gi18n.h>
+ #include <gtk/gtk.h>
+-#include <gtk/gtkx.h>
++#include <gdk/gdkx.h>
+ 
+ #include "gs-window.h"
+ #include "gs-marshal.h"
+@@ -89,7 +89,7 @@ set_invisible_cursor (GdkWindow *window,
+         gdk_window_set_cursor (window, cursor);
+ 
+         if (cursor) {
+-                g_object_unref (cursor);
++                gdk_cursor_unref (cursor);
+         }
+ }
+ 
+@@ -120,12 +120,12 @@ gs_window_override_user_time (GSWindow *window)
+ static void
+ clear_widget (GtkWidget *widget)
+ {
+-        GdkRGBA rgba = { 0.0, 0.0, 0.0, 1.0 };
++        GdkColor rgba = { 0, 0, 0, 0 };
+ 
+         if (!gtk_widget_get_realized (widget))
+                 return;
+ 
+-        gtk_widget_override_background_color (widget, GTK_STATE_FLAG_NORMAL, &rgba);
++        gtk_widget_modify_bg (widget, GTK_STATE_NORMAL, &rgba);
+         gtk_widget_queue_draw (GTK_WIDGET (widget));
+ }
+ 
+@@ -399,7 +399,7 @@ select_popup_events (void)
+         events = SubstructureNotifyMask | attr.your_event_mask;
+         XSelectInput (GDK_DISPLAY_XDISPLAY (gdk_display_get_default ()), GDK_ROOT_WINDOW (), events);
+ 
+-        gdk_error_trap_pop_ignored ();
++        gdk_error_trap_pop ();
+ }
+ 
+ static void
+@@ -606,7 +606,7 @@ gs_window_real_size_request (GtkWidget      *widget,
+         bin = GTK_BIN (widget);
+ 
+         if (gtk_bin_get_child (bin) && gtk_widget_get_visible (gtk_bin_get_child (bin))) {
+-                gtk_widget_get_preferred_size(gtk_bin_get_child (bin), NULL, requisition);
++                gtk_widget_size_request (gtk_bin_get_child (bin), requisition);
+         }
+ 
+         old_geometry = window->priv->geometry;
+@@ -691,30 +691,6 @@ gs_window_real_visibility_notify_event (GtkWidget          *widget,
+         return FALSE;
+ }
+ 
+-static void
+-gs_window_real_get_preferred_width (GtkWidget *widget,
+-                               gint      *minimal_width,
+-                               gint      *natural_width)
+-{
+-        GtkRequisition requisition;
+-
+-        gs_window_real_size_request (widget, &requisition);
+-
+-        *minimal_width = *natural_width = requisition.width;
+-}
+-
+-static void
+-gs_window_real_get_preferred_height (GtkWidget *widget,
+-                                gint      *minimal_height,
+-                                gint      *natural_height)
+-{
+-        GtkRequisition requisition;
+-
+-        gs_window_real_size_request (widget, &requisition);
+-
+-        *minimal_height = *natural_height = requisition.height;
+-}
+-
+ static void
+ gs_window_class_init (GSWindowClass *klass)
+ {
+@@ -733,8 +709,7 @@ gs_window_class_init (GSWindowClass *klass)
+         widget_class->motion_notify_event = gs_window_real_motion_notify_event;
+         widget_class->button_press_event  = gs_window_real_button_press_event;
+         widget_class->scroll_event        = gs_window_real_scroll_event;
+-        widget_class->get_preferred_width        = gs_window_real_get_preferred_width;
+-        widget_class->get_preferred_height       = gs_window_real_get_preferred_height;
++        widget_class->size_request        = gs_window_real_size_request;
+         widget_class->grab_broken_event   = gs_window_real_grab_broken;
+         widget_class->visibility_notify_event = gs_window_real_visibility_notify_event;
+ 
+@@ -763,10 +738,10 @@ gs_window_class_init (GSWindowClass *klass)
+ static void
+ on_drawing_area_realized (GtkWidget *drawing_area)
+ {
+-        GdkRGBA black = { 0.0, 0.0, 0.0, 1.0 };
++        GdkColor black = { 0, 0, 0, 0 };
+ 
+-        gdk_window_set_background_rgba (gtk_widget_get_window (drawing_area),
+-                                        &black);
++        gdk_window_set_background (gtk_widget_get_window (drawing_area),
++                                   &black);
+ }
+ 
+ static void
+diff --git a/src/preview.c b/src/preview.c
+index 60e0a9e..ad59e0d 100644
+--- a/src/preview.c
++++ b/src/preview.c
+@@ -54,6 +54,16 @@ content_draw_cb (GtkWidget *widget,
+         content_draw (widget, cr);
+ }
+ 
++static void
++content_expose_cb (GtkWidget *widget,
++                   GdkEvent  *event,
++                   gpointer   user_data)
++{
++        cairo_t *cr = gdk_cairo_create (gtk_widget_get_window (widget));
++        content_draw_cb (widget, cr, user_data);
++        cairo_destroy (cr);
++}
++
+ int
+ main (int    argc,
+       char **argv)
+@@ -108,8 +118,8 @@ main (int    argc,
+ 	gtk_widget_set_app_paintable (drawing_area, TRUE);
+ 	gtk_container_add (GTK_CONTAINER (window), drawing_area);
+ 
+-        g_signal_connect_object (drawing_area, "draw",
+-                                 G_CALLBACK (content_draw_cb), NULL, 0);
++        g_signal_connect_object (drawing_area, "expose-event",
++                                 G_CALLBACK (content_expose_cb), NULL, 0);
+ 
+ 	gtk_widget_show (window);
+ 

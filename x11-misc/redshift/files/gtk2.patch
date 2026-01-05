@@ -1,0 +1,40 @@
+diff --git a/src/redshift-gtk/statusicon.py b/src/redshift-gtk/statusicon.py
+index 3325403..42696d7 100644
+--- a/src/redshift-gtk/statusicon.py
++++ b/src/redshift-gtk/statusicon.py
+@@ -28,13 +28,13 @@ import signal
+ import gettext
+ 
+ import gi
+-gi.require_version('Gtk', '3.0')
++gi.require_version('Gtk', '2.0')
+ 
+ from gi.repository import Gtk, GLib
+ 
+ try:
+-    gi.require_version('AppIndicator3', '0.1')
+-    from gi.repository import AppIndicator3 as appindicator
++    gi.require_version('AppIndicator', '0.1')
++    from gi.repository import AppIndicator as appindicator
+ except (ImportError, ValueError):
+     appindicator = None
+ 
+@@ -115,7 +115,7 @@ class RedshiftStatusIcon(object):
+         self.info_dialog.set_property('border-width', 6)
+         self.info_dialog.connect('delete-event', self.close_info_dialog_cb)
+ 
+-        content_area = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
++        content_area = Gtk.VBox(homogeneous=False, spacing=6)
+         self.info_dialog.add(content_area)
+         content_area.show()
+ 
+@@ -208,8 +208,7 @@ class RedshiftStatusIcon(object):
+     def popup_menu_cb(self, widget, button, time, data=None):
+         """Callback when the popup menu on the status icon has to open."""
+         self.status_menu.show_all()
+-        self.status_menu.popup(None, None, Gtk.StatusIcon.position_menu,
+-                               self.status_icon, button, time)
++        self.status_menu.popup(None, None, None, None, button, time)
+ 
+     def toggle_cb(self, widget, data=None):
+         """Callback when a request to toggle redshift was made."""

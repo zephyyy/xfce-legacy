@@ -1,0 +1,90 @@
+From ec17da748f2036e6de58309109285abaca57ed85 Mon Sep 17 00:00:00 2001
+From: Eric Koegel <eric.koegel@gmail.com>
+Date: Tue, 7 Jun 2016 16:03:17 +0300
+Subject: [PATCH 2/2] New function: xfce_widget_reparent
+
+This is a simple helper function. Taken from:
+https://github.com/bluesabre/xfce4-settings-gtk3/blob/master/dialogs/appearance-settings/main.c#L133
+---
+ libxfce4ui/libxfce4ui.symbols    |  1 +
+ libxfce4ui/xfce-gtk-extensions.c | 38 ++++++++++++++++++++++++++++++++
+ libxfce4ui/xfce-gtk-extensions.h |  3 +++
+ 3 files changed, 42 insertions(+)
+
+diff --git a/libxfce4ui/libxfce4ui.symbols b/libxfce4ui/libxfce4ui.symbols
+index 1a6ea6a..e045aa6 100644
+--- a/libxfce4ui/libxfce4ui.symbols
++++ b/libxfce4ui/libxfce4ui.symbols
+@@ -84,6 +84,7 @@ xfce_gtk_frame_box_new G_GNUC_MALLOC
+ xfce_gtk_frame_box_new_with_content G_GNUC_MALLOC
+ xfce_gtk_window_center_on_active_screen
+ xfce_gtk_menu_popup_until_mapped
++xfce_widget_reparent
+ #endif
+ #endif
+ 
+diff --git a/libxfce4ui/xfce-gtk-extensions.c b/libxfce4ui/xfce-gtk-extensions.c
+index e80a12c..20ea464 100644
+--- a/libxfce4ui/xfce-gtk-extensions.c
++++ b/libxfce4ui/xfce-gtk-extensions.c
+@@ -264,5 +264,43 @@ xfce_gtk_menu_popup_until_mapped (GtkMenu *menu,
+   return gtk_widget_get_mapped (GTK_WIDGET (menu));
+ }
+ 
++
++
++/**
++ * xfce_widget_reparent:
++ * @widget: a #GtkWidget.
++ * @new_parent: a #GtkContainer to move the widget into
++ *
++ * Moves a widget from one GtkContainer to another, handling reference
++ * count issues to avoid destroying the widget.
++ *
++ * Return value: %TRUE if the widget could be moved, %FALSE otherwise.
++ */
++gboolean
++xfce_widget_reparent (GtkWidget *widget,
++                      GtkWidget *new_parent)
++{
++  GtkWidget *parent;
++
++  g_return_val_if_fail (GTK_IS_WIDGET (widget), FALSE);
++  g_return_val_if_fail (GTK_IS_WIDGET (new_parent), FALSE);
++
++  if (!GTK_IS_CONTAINER (new_parent))
++    return FALSE;
++
++  parent = gtk_widget_get_parent(widget);
++  if (parent)
++    {
++      g_object_ref (widget);
++      gtk_container_remove (GTK_CONTAINER(parent), widget);
++      gtk_container_add (GTK_CONTAINER(new_parent), widget);
++      g_object_unref (widget);
++
++      return TRUE;
++    }
++
++  return FALSE;
++}
++
+ #define __XFCE_GTK_EXTENSIONS_C__
+ #include <libxfce4ui/libxfce4ui-aliasdef.c>
+diff --git a/libxfce4ui/xfce-gtk-extensions.h b/libxfce4ui/xfce-gtk-extensions.h
+index babca0b..e075375 100644
+--- a/libxfce4ui/xfce-gtk-extensions.h
++++ b/libxfce4ui/xfce-gtk-extensions.h
+@@ -47,6 +47,9 @@ gboolean   xfce_gtk_menu_popup_until_mapped        (GtkMenu             *menu,
+                                                     guint                button,
+                                                     guint32              activate_time);
+ 
++gboolean   xfce_widget_reparent                    (GtkWidget           *widget,
++                                                    GtkWidget           *new_parent);
++
+ G_END_DECLS
+ 
+ #endif /* !__XFCE_GTK_EXTENSIONS_H__ */
+-- 
+2.26.2
+

@@ -1,0 +1,42 @@
+From b4c98fd279981cc93fa0ffde593d5c3adec0869a Mon Sep 17 00:00:00 2001
+From: Matthew Brush <matt@xfce.org>
+Date: Sat, 5 Oct 2019 10:18:04 -0700
+Subject: [PATCH] Fix building with `--enable-dbus --disable-gtk3`
+
+---
+ configure.ac      | 1 +
+ mousepad/Makefile.am | 6 ++++--
+ 2 files changed, 5 insertions(+), 2 deletions(-)
+
+diff --git a/configure.ac b/configure.ac
+index bf8172bd9..f497cb6c0 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -139,6 +139,7 @@ AM_CONDITIONAL([HAVE_DBUS], [test "x$enable_dbus" = "xyes"])
+ 
+ AS_IF([test "x$enable_dbus" = "xyes"],
+ [
++  XDT_CHECK_PACKAGE([GIO_UNIX], [gio-unix-2.0], [2.42.0])
+   AC_PATH_PROG([GDBUS_CODEGEN], [gdbus-codegen])
+   AC_DEFINE([HAVE_DBUS], [1], [Define if DBUS support is enabled])
+ ])
+diff --git a/mousepad/Makefile.am b/mousepad/Makefile.am
+index 7bd0f8c2a..0265fc085 100644
+--- a/mousepad/Makefile.am
++++ b/mousepad/Makefile.am
+@@ -97,10 +97,12 @@ mousepad_dbus_sources = \
+ 
+ mousepad_CFLAGS += \
+ 	-DDBUS_API_SUBJECT_TO_CHANGE \
+-	$(DBUS_CFLAGS)
++	$(DBUS_CFLAGS) \
++	$(GIO_UNIX_CFLAGS)
+ 
+ mousepad_LDADD +=	\
+-	$(DBUS_LIBS)
++	$(DBUS_LIBS) \
++	$(GIO_UNIX_LIBS)
+ endif
+ 
+ if WITH_KEYFILE_SETTINGS
+-- 

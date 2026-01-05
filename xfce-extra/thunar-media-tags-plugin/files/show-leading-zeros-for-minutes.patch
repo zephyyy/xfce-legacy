@@ -1,0 +1,23 @@
+From 1768a06f731cadd6c8edc89cd24deee7d6845f43 Mon Sep 17 00:00:00 2001
+From: Thomas Lange <thomas-lange2@gmx.de>
+Date: Sun, 6 Oct 2013 16:37:46 +0200
+Subject: [PATCH] Show leading zeros for minutes
+
+Signed-off-by: Simon Steinbeiss <simon.steinbeiss@elfenbeinturm.at>
+---
+ thunar-plugin/audio-tags-page.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/thunar-plugin/audio-tags-page.c b/thunar-plugin/audio-tags-page.c
+index b5862f9..b697e69 100644
+--- a/thunar-plugin/audio-tags-page.c
++++ b/thunar-plugin/audio-tags-page.c
+@@ -990,7 +990,7 @@ audio_tags_page_info_activate (GtkAction *action,
+ 
+   /* Retrieve audio information */
+   properties = taglib_file_audioproperties (page->taglib_file);
+-  length = g_strdup_printf (_("%d:%d Minutes"), taglib_audioproperties_length (properties) / 60, taglib_audioproperties_length (properties) % 60);
++  length = g_strdup_printf (_("%d:%02d Minutes"), taglib_audioproperties_length (properties) / 60, taglib_audioproperties_length (properties) % 60);
+   bitrate = g_strdup_printf (_("%d KBit/s"), taglib_audioproperties_bitrate (properties));
+   samplerate = g_strdup_printf (_("%d Hz"), taglib_audioproperties_samplerate (properties));
+   channels = g_strdup_printf ("%d", taglib_audioproperties_channels (properties));

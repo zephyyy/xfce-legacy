@@ -1,0 +1,28 @@
+From 96d1421f9e0c140b77cc982a5a68c84fbf7d927c Mon Sep 17 00:00:00 2001
+From: Nick Schermer <nick@xfce.org>
+Date: Sat, 11 May 2013 14:55:29 +0200
+Subject: [PATCH] Fix linking.
+
+---
+ thunar-plugin/Makefile.am | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/thunar-plugin/Makefile.am b/thunar-plugin/Makefile.am
+index 281ede6..4d33852 100644
+--- a/thunar-plugin/Makefile.am
++++ b/thunar-plugin/Makefile.am
+@@ -32,10 +32,12 @@ thunar_media_tags_plugin_la_LDFLAGS =					\
+ 	-avoid-version							\
+ 	-export-dynamic							\
+ 	-module								\
++	$(PLATFORM_LDFLAGS)
++
++thunar_media_tags_plugin_la_LIBADD =					\
+ 	$(EXO_LIBS)							\
+ 	$(THUNARX_LIBS)							\
+ 	$(TAGLIB_LIBS)							\
+-	$(TAGLIBC_LIBS)							\
+-	$(PLATFORM_LDFLAGS)
++	$(TAGLIBC_LIBS)
+ 
+ # vi:set ts=8 sw=8 noet ai nocindent syntax=automake:

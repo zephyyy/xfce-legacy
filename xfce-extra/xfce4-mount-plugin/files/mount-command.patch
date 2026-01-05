@@ -1,0 +1,13 @@
+--- a/panel-plugin/mount-plugin.h
++++ b/panel-plugin/mount-plugin.h
+@@ -39,8 +39,8 @@
+ 
+ #define BORDER 6
+ 
+-#define DEFAULT_MOUNT_COMMAND "mount %d"
+-#define DEFAULT_UMOUNT_COMMAND "umount %d"
++#define DEFAULT_MOUNT_COMMAND "mount %m"
++#define DEFAULT_UMOUNT_COMMAND "umount %m"
+ 
+ #define DEFAULT_ICON PACKAGE_DATA_DIR "/icons/hicolor/scalable/apps/xfce-mount.svg"
+ 

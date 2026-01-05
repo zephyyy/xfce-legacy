@@ -1,0 +1,41 @@
+From 06b89a03504817776563b8cdb5db4420d9c2bae5 Mon Sep 17 00:00:00 2001
+From: Landry Breuil <landry@xfce.org>
+Date: Fri, 7 Dec 2018 19:54:11 +0100
+Subject: [PATCH] Fix a long-standing memory allocation issue when parsing mpc
+ outputs
+
+grow the outputs pointers array when there's a new output to store
+Thanks valgrind for the hints..
+---
+ panel-plugin/simple-libmpd.c    | 4 ++++
+ panel-plugin/xfce4-mpc-plugin.c | 2 ++
+ 2 files changed, 6 insertions(+)
+
+diff --git a/panel-plugin/simple-libmpd.c b/panel-plugin/simple-libmpd.c
+index 526f305..bceea95 100644
+--- a/panel-plugin/simple-libmpd.c
++++ b/panel-plugin/simple-libmpd.c
+@@ -468,6 +468,10 @@ void parse_outputs_answer(MpdObj *mo, void *param)
+          g_strfreev(tokens);
+       }
+       md->nb++;
++      if (strcmp(lines[i],"OK")) {
++         /* make room for the next output ptr */
++         md->alloutputs = g_renew(mpd_Output*, md->alloutputs, md->nb + 1);
++      }
+    }
+    g_strfreev(lines);
+ }
+diff --git a/panel-plugin/xfce4-mpc-plugin.c b/panel-plugin/xfce4-mpc-plugin.c
+index 99d6542..bb8f836 100644
+--- a/panel-plugin/xfce4-mpc-plugin.c
++++ b/panel-plugin/xfce4-mpc-plugin.c
+@@ -408,6 +408,8 @@ mpc_update_outputs(t_mpc* mpc)
+          mpc->mpd_outputs[i]->id = data->output_dev->id;
+          mpc->mpd_outputs[i]->menuitem = chkitem;
+          mpc->nb_outputs++;
++         /* make room for the next output ptr */
++         mpc->mpd_outputs = g_renew(t_mpd_output*, mpc->mpd_outputs, mpc->nb_outputs + 1);
+       }
+       mpc->mpd_outputs[i]->enabled = data->output_dev->enabled;
+       gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(mpc->mpd_outputs[i]->menuitem), mpc->mpd_outputs[i]->enabled);

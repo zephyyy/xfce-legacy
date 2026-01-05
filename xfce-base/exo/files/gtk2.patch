@@ -1,0 +1,994 @@
+--- a/exo-desktop-item-edit/exo-die-editor.c
++++ b/exo-desktop-item-edit/exo-die-editor.c
+@@ -72,12 +72,12 @@
+ 
+ struct _ExoDieEditorClass
+ {
+-  GtkGridClass __parent__;
++  GtkTableClass __parent__;
+ };
+ 
+ struct _ExoDieEditor
+ {
+-  GtkGrid         __parent__;
++  GtkTable         __parent__;
+   GtkWidget       *name_entry;
+   GtkWidget       *icon_button;
+   ExoDieEditorMode mode;
+@@ -93,7 +93,7 @@
+ 
+ 
+ 
+-G_DEFINE_TYPE (ExoDieEditor, exo_die_editor, GTK_TYPE_GRID)
++G_DEFINE_TYPE (ExoDieEditor, exo_die_editor, GTK_TYPE_TABLE)
+ 
+ 
+ 
+@@ -270,6 +270,7 @@
+ exo_die_editor_init (ExoDieEditor *editor)
+ {
+   GtkWidget *button;
++  GtkWidget *align;
+   GtkWidget *entry;
+   GtkWidget *label;
+   GtkWidget *image;
+@@ -286,23 +287,23 @@
+   editor->path = g_strdup ("");
+ 
+   /* configure the table */
+-  gtk_grid_set_column_spacing (GTK_GRID (editor), 12);
+-  gtk_grid_set_row_spacing (GTK_GRID (editor), 6);
++  gtk_table_resize (GTK_TABLE (editor), 8, 2);
++  gtk_table_set_col_spacings (GTK_TABLE (editor), 12);
++  gtk_table_set_row_spacings (GTK_TABLE (editor), 0);
+ 
+   row = 0;
+ 
+   /* TRANSLATORS: Label in "Create Launcher"/"Create Link" dialog, make sure to avoid mnemonic conflicts */
+   label = gtk_label_new_with_mnemonic (_("_Name:"));
+   gtk_label_set_use_markup (GTK_LABEL (label), TRUE);
+-  g_object_set (label, "xalign", 1.0f, "yalign", 0.5f, NULL);
+-  gtk_grid_attach (GTK_GRID (editor), label, 0, row, 1, 1);
++  gtk_misc_set_alignment (GTK_MISC (label), 1.0f, 0.5f);
++  gtk_table_attach (GTK_TABLE (editor), label, 0, 1, row, row + 1, GTK_FILL, GTK_FILL, 0, 3);
+   gtk_widget_show (label);
+ 
+   editor->name_entry = gtk_entry_new ();
+   gtk_entry_set_activates_default (GTK_ENTRY (editor->name_entry), TRUE);
+   exo_mutual_binding_new (G_OBJECT (editor), "name", G_OBJECT (editor->name_entry), "text");
+-  gtk_grid_attach (GTK_GRID (editor), editor->name_entry, 1, row, 1, 1);
+-  g_object_set (editor->name_entry, "hexpand", TRUE, NULL);
++  gtk_table_attach (GTK_TABLE (editor), editor->name_entry, 1, 2, row, row + 1, GTK_EXPAND | GTK_FILL, GTK_FILL, 0, 3);
+   gtk_label_set_mnemonic_widget (GTK_LABEL (label), editor->name_entry);
+   gtk_widget_show (editor->name_entry);
+ 
+@@ -311,15 +312,14 @@
+   /* TRANSLATORS: Label in "Create Launcher"/"Create Link" dialog, make sure to avoid mnemonic conflicts */
+   label = gtk_label_new_with_mnemonic (_("C_omment:"));
+   gtk_label_set_use_markup (GTK_LABEL (label), TRUE);
+-  g_object_set (label, "xalign", 1.0f, "yalign", 0.5f, NULL);
+-  gtk_grid_attach (GTK_GRID (editor), label, 0, row, 1, 1);
++  gtk_misc_set_alignment (GTK_MISC (label), 1.0f, 0.5f);
++  gtk_table_attach (GTK_TABLE (editor), label, 0, 1, row, row + 1, GTK_FILL, GTK_FILL, 0, 3);
+   gtk_widget_show (label);
+ 
+   entry = gtk_entry_new ();
+   gtk_entry_set_activates_default (GTK_ENTRY (entry), TRUE);
+   exo_mutual_binding_new (G_OBJECT (editor), "comment", G_OBJECT (entry), "text");
+-  gtk_grid_attach (GTK_GRID (editor), entry, 1, row, 1, 1);
+-  g_object_set (entry, "hexpand", TRUE, NULL);
++  gtk_table_attach (GTK_TABLE (editor), entry, 1, 2, row, row + 1, GTK_EXPAND | GTK_FILL, GTK_FILL, 0, 3);
+   gtk_label_set_mnemonic_widget (GTK_LABEL (label), entry);
+   gtk_widget_show (entry);
+ 
+@@ -328,15 +328,14 @@
+   /* TRANSLATORS: Label in "Create Launcher" dialog, make sure to avoid mnemonic conflicts */
+   label = gtk_label_new_with_mnemonic (_("Comm_and:"));
+   gtk_label_set_use_markup (GTK_LABEL (label), TRUE);
+-  g_object_set (label, "xalign", 1.0f, "yalign", 0.5f, NULL);
++  gtk_misc_set_alignment (GTK_MISC (label), 1.0f, 0.5f);
+   exo_binding_new_full (G_OBJECT (editor), "mode", G_OBJECT (label), "visible", exo_die_true_if_application, NULL, NULL);
+-  gtk_grid_attach (GTK_GRID (editor), label, 0, row, 1, 1);
++  gtk_table_attach (GTK_TABLE (editor), label, 0, 1, row, row + 1, GTK_FILL, GTK_FILL, 0, 3);
+ 
+   entry = exo_die_command_entry_new ();
+   exo_mutual_binding_new (G_OBJECT (editor), "command", G_OBJECT (entry), "text");
+   exo_binding_new_full (G_OBJECT (editor), "mode", G_OBJECT (entry), "visible", exo_die_true_if_application, NULL, NULL);
+-  gtk_grid_attach (GTK_GRID (editor), entry, 1, row, 1, 1);
+-  g_object_set (entry, "hexpand", TRUE, NULL);
++  gtk_table_attach (GTK_TABLE (editor), entry, 1, 2, row, row + 1, GTK_EXPAND | GTK_FILL, GTK_FILL, 0, 3);
+   gtk_label_set_mnemonic_widget (GTK_LABEL (label), entry);
+ 
+   row += 1;
+@@ -344,16 +343,15 @@
+   /* TRANSLATORS: Label in "Create Link" dialog, make sure to avoid mnemonic conflicts */
+   label = gtk_label_new_with_mnemonic (_("_URL:"));
+   gtk_label_set_use_markup (GTK_LABEL (label), TRUE);
+-  g_object_set (label, "xalign", 1.0f, "yalign", 0.5f, NULL);
++  gtk_misc_set_alignment (GTK_MISC (label), 1.0f, 0.5f);
+   exo_binding_new_full (G_OBJECT (editor), "mode", G_OBJECT (label), "visible", exo_die_true_if_link, NULL, NULL);
+-  gtk_grid_attach (GTK_GRID (editor), label, 0, row, 1, 1);
++  gtk_table_attach (GTK_TABLE (editor), label, 0, 1, row, row + 1, GTK_FILL, GTK_FILL, 0, 3);
+ 
+   entry = gtk_entry_new ();
+   gtk_entry_set_activates_default (GTK_ENTRY (entry), TRUE);
+   exo_mutual_binding_new (G_OBJECT (editor), "url", G_OBJECT (entry), "text");
+   exo_binding_new_full (G_OBJECT (editor), "mode", G_OBJECT (entry), "visible", exo_die_true_if_link, NULL, NULL);
+-  gtk_grid_attach (GTK_GRID (editor), entry, 1, row, 1, 1);
+-  g_object_set (entry, "hexpand", TRUE, NULL);
++  gtk_table_attach (GTK_TABLE (editor), entry, 1, 2, row, row + 1, GTK_EXPAND | GTK_FILL, GTK_FILL, 0, 3);
+   gtk_label_set_mnemonic_widget (GTK_LABEL (label), entry);
+ 
+   row += 1;
+@@ -361,13 +359,12 @@
+   /* TRANSLATORS: Label in "Create Launcher" dialog, make sure to avoid mnemonic conflicts */
+   label = gtk_label_new_with_mnemonic (_("Working _Directory:"));
+   gtk_label_set_use_markup (GTK_LABEL (label), TRUE);
+-  g_object_set (label, "xalign", 1.0f, "yalign", 0.5f, NULL);
++  gtk_misc_set_alignment (GTK_MISC (label), 1.0f, 0.5f);
+   exo_binding_new_full (G_OBJECT (editor), "mode", G_OBJECT (label), "visible", exo_die_true_if_application, NULL, NULL);
+-  gtk_grid_attach (GTK_GRID (editor), label, 0, row, 1, 1);
++  gtk_table_attach (GTK_TABLE (editor), label, 0, 1, row, row + 1, GTK_FILL, GTK_FILL, 0, 3);
+ 
+-  box = gtk_box_new (GTK_ORIENTATION_HORIZONTAL, 6);
+-  gtk_grid_attach (GTK_GRID (editor), box, 1, row, 1, 1);
+-  g_object_set (box, "hexpand", TRUE, NULL);
++  box = gtk_hbox_new (FALSE, 6);
++  gtk_table_attach (GTK_TABLE (editor), box, 1, 2, row, row + 1, GTK_EXPAND | GTK_FILL, GTK_FILL, 0, 3);
+   exo_binding_new_full (G_OBJECT (editor), "mode", G_OBJECT (box), "visible", exo_die_true_if_application, NULL, NULL);
+ 
+   entry = gtk_entry_new ();
+@@ -391,16 +388,19 @@
+   /* TRANSLATORS: Label in "Create Launcher"/"Create Link" dialog, make sure to avoid mnemonic conflicts */
+   label = gtk_label_new_with_mnemonic (_("_Icon:"));
+   gtk_label_set_use_markup (GTK_LABEL (label), TRUE);
+-  g_object_set (label, "xalign", 1.0f, "yalign", 0.5f, NULL);
+-  gtk_grid_attach (GTK_GRID (editor), label, 0, row, 1, 1);
++  gtk_misc_set_alignment (GTK_MISC (label), 1.0f, 0.5f);
++  gtk_table_attach (GTK_TABLE (editor), label, 0, 1, row, row + 1, GTK_FILL, GTK_FILL, 0, 3);
+   gtk_widget_show (label);
+ 
++  align = gtk_alignment_new (0.0f, 0.5f, 0.0f, 0.0f);
++  gtk_table_attach (GTK_TABLE (editor), align, 1, 2, row, row + 1, GTK_EXPAND | GTK_FILL, GTK_FILL, 0, 3);
++  gtk_widget_show (align);
++
+   editor->icon_button = gtk_button_new ();
+   g_signal_connect (G_OBJECT (editor->icon_button), "clicked", G_CALLBACK (exo_die_editor_icon_clicked), editor);
++  gtk_container_add (GTK_CONTAINER (align), editor->icon_button);
+   gtk_label_set_mnemonic_widget (GTK_LABEL (label), editor->icon_button);
+   gtk_widget_show (editor->icon_button);
+-  gtk_grid_attach (GTK_GRID (editor), editor->icon_button, 1, row, 1, 1);
+-  g_object_set (editor->icon_button, "expand", FALSE, "halign", GTK_ALIGN_START, "valign", GTK_ALIGN_CENTER, NULL);
+ 
+   /* TRANSLATORS: Label for the icon button in "Create Launcher"/"Create Link" dialog if no icon selected */
+   label = gtk_label_new (_("No icon"));
+@@ -411,9 +411,9 @@
+ 
+   label = gtk_label_new (_("Options:"));
+   gtk_label_set_use_markup (GTK_LABEL (label), TRUE);
+-  g_object_set (label, "xalign", 1.0f, "yalign", 0.5f, NULL);
++  gtk_misc_set_alignment (GTK_MISC (label), 1.0f, 0.5f);
+   exo_binding_new_full (G_OBJECT (editor), "mode", G_OBJECT (label), "visible", exo_die_true_if_application, NULL, NULL);
+-  gtk_grid_attach (GTK_GRID (editor), label, 0, row, 1, 1);
++  gtk_table_attach (GTK_TABLE (editor), label, 0, 1, row, row + 1, GTK_FILL, GTK_FILL, 0, 3);
+ 
+   /* TRANSLATORS: Check button label in "Create Launcher" dialog, make sure to avoid mnemonic conflicts
+    *              and sync your translations with the translations in Thunar and xfce4-panel.
+@@ -424,8 +424,7 @@
+                                          "startup notification."));
+   exo_mutual_binding_new (G_OBJECT (editor), "snotify", G_OBJECT (button), "active");
+   exo_binding_new_full (G_OBJECT (editor), "mode", G_OBJECT (button), "visible", exo_die_true_if_application, NULL, NULL);
+-  gtk_grid_attach (GTK_GRID (editor), button, 1, row, 1, 1);
+-  g_object_set (button, "hexpand", TRUE, NULL);
++  gtk_table_attach (GTK_TABLE (editor), button, 1, 2, row, row + 1, GTK_EXPAND | GTK_FILL, GTK_FILL, 0, 3);
+ 
+   row += 1;
+ 
+@@ -436,8 +435,7 @@
+   gtk_widget_set_tooltip_text (button, _("Select this option to run the command in a terminal window."));
+   exo_mutual_binding_new (G_OBJECT (editor), "terminal", G_OBJECT (button), "active");
+   exo_binding_new_full (G_OBJECT (editor), "mode", G_OBJECT (button), "visible", exo_die_true_if_application, NULL, NULL);
+-  gtk_grid_attach (GTK_GRID (editor), button, 1, row, 1, 1);
+-  g_object_set (button, "hexpand", TRUE, NULL);
++  gtk_table_attach (GTK_TABLE (editor), button, 1, 2, row, row + 1, GTK_EXPAND | GTK_FILL, GTK_FILL, 0, 3);
+ }
+ 
+ 
+--- a/exo-helper/exo-helper-chooser.c
++++ b/exo-helper/exo-helper-chooser.c
+@@ -60,12 +60,12 @@
+ 
+ struct _ExoHelperChooserClass
+ {
+-  GtkBinClass __parent__;
++  GtkAlignmentClass __parent__;
+ };
+ 
+ struct _ExoHelperChooser
+ {
+-  GtkBin __parent__;
++  GtkAlignment __parent__;
+ 
+   GtkWidget         *image;
+   GtkWidget         *label;
+@@ -78,7 +78,7 @@
+ 
+ 
+ 
+-G_DEFINE_TYPE (ExoHelperChooser, exo_helper_chooser, GTK_TYPE_BIN)
++G_DEFINE_TYPE (ExoHelperChooser, exo_helper_chooser, GTK_TYPE_ALIGNMENT)
+ 
+ 
+ 
+@@ -151,7 +151,7 @@
+   atk_object_set_name (object, _("Application Chooser Button"));
+   atk_object_set_description (object, _("Press left mouse button to change the selected application."));
+ 
+-  hbox = gtk_box_new (GTK_ORIENTATION_HORIZONTAL, 4);
++  hbox = gtk_hbox_new (FALSE, 4);
+   gtk_container_add (GTK_CONTAINER (button), hbox);
+   gtk_widget_show (hbox);
+ 
+@@ -170,15 +170,15 @@
+   atk_relation_set_add (relations, relation);
+   g_object_unref (G_OBJECT (relation));
+ 
+-  separator = g_object_new (GTK_TYPE_SEPARATOR, "orientation", GTK_ORIENTATION_VERTICAL, "height-request", 16, NULL);
++  separator = g_object_new (GTK_TYPE_VSEPARATOR, "height-request", 16, NULL);
+   gtk_box_pack_start (GTK_BOX (hbox), separator, FALSE, FALSE, 0);
+   gtk_widget_show (separator);
+ 
+-  arrow = gtk_image_new_from_icon_name ("pan-down-symbolic", GTK_ICON_SIZE_BUTTON);
++  arrow = gtk_arrow_new (GTK_ARROW_DOWN, GTK_SHADOW_NONE);
+   gtk_box_pack_start (GTK_BOX (hbox), arrow, FALSE, FALSE, 0);
+   gtk_widget_show (arrow);
+ 
+-  /*gtk_widget_pop_composite_child ();*/
++  gtk_widget_pop_composite_child ();
+ }
+ 
+ 
+@@ -250,9 +250,7 @@
+   const gchar  *icon_name;
+   ExoHelper    *helper;
+   GdkPixbuf    *icon = NULL;
+-  GIcon        *gicon = NULL;
+   gint          icon_size = 0;
+-  gboolean      gicon_set = FALSE;
+ 
+   g_return_if_fail (EXO_IS_HELPER_CHOOSER (chooser));
+ 
+@@ -268,31 +266,24 @@
+       if (G_LIKELY (icon_name != NULL))
+         {
+           gtk_icon_size_lookup (GTK_ICON_SIZE_MENU, &icon_size, &icon_size);
+-          if (g_path_is_absolute (icon_name)) {
+-            icon = gdk_pixbuf_new_from_file_at_size (icon_name, icon_size, icon_size, NULL);
+-          }
+-          else {
+-            gicon = g_themed_icon_new_with_default_fallbacks (icon_name);
+-            gicon_set = TRUE;
+-          }
++          if (g_path_is_absolute (icon_name))
++            icon = gdk_pixbuf_new_from_file_at_scale (icon_name, icon_size, icon_size, TRUE, NULL);
++          else
++            icon = gtk_icon_theme_load_icon (icon_theme, icon_name, icon_size, 0, NULL);
+         }
+ 
+       /* fallback to application-x-executable */
+-      if (G_UNLIKELY (icon == NULL) && !gicon_set)
++      if (G_UNLIKELY (icon == NULL))
+         icon = gtk_icon_theme_load_icon (icon_theme, "application-x-executable", icon_size, 0, NULL);
+ 
++      /* fallback to gnome-mime-application-x-executable */
++      if (G_UNLIKELY (icon == NULL))
++        icon = gtk_icon_theme_load_icon (icon_theme, "gnome-mime-application-x-executable", icon_size, 0, NULL);
++
+       /* setup the icon for the chooser image */
+-      if (gicon_set)
+-        {
+-          gtk_image_set_from_gicon (GTK_IMAGE (chooser->image), gicon, GTK_ICON_SIZE_MENU);
+-          gtk_image_set_pixel_size (GTK_IMAGE (chooser->image), icon_size);
+-        }
+-      else
+-        {
+-          gtk_image_set_from_pixbuf (GTK_IMAGE (chooser->image), icon);
+-          if (G_LIKELY (icon != NULL))
+-            g_object_unref (G_OBJECT (icon));
+-        }
++      gtk_image_set_from_pixbuf (GTK_IMAGE (chooser->image), icon);
++      if (G_LIKELY (icon != NULL))
++        g_object_unref (G_OBJECT (icon));
+ 
+       gtk_label_set_text (GTK_LABEL (chooser->label), exo_helper_get_name (helper));
+       g_object_unref (G_OBJECT (helper));
+@@ -544,18 +535,20 @@
+   gtk_dialog_set_response_sensitive (GTK_DIALOG (dialog), GTK_RESPONSE_OK, FALSE);
+   gtk_container_set_border_width (GTK_CONTAINER (dialog), 5);
+   gtk_box_set_spacing (GTK_BOX (gtk_dialog_get_content_area (GTK_DIALOG (dialog))), 6);
++  gtk_container_set_border_width (GTK_CONTAINER (gtk_dialog_get_action_area (GTK_DIALOG (dialog))), 5);
++  gtk_box_set_spacing (GTK_BOX (gtk_dialog_get_action_area (GTK_DIALOG (dialog))), 6);
+   gtk_window_set_resizable (GTK_WINDOW (dialog), FALSE);
+ 
+-  hbox = g_object_new (GTK_TYPE_BOX, "orientation", GTK_ORIENTATION_HORIZONTAL, "border-width", 5, "spacing", 12, NULL);
++  hbox = g_object_new (GTK_TYPE_HBOX, "border-width", 5, "spacing", 12, NULL);
+   gtk_box_pack_start (GTK_BOX (gtk_dialog_get_content_area (GTK_DIALOG (dialog))), hbox, TRUE, TRUE, 0);
+   gtk_widget_show (hbox);
+ 
+   image = gtk_image_new_from_icon_name ("preferences-desktop-default-applications", GTK_ICON_SIZE_DIALOG);
+-  g_object_set (image, "halign", GTK_ALIGN_CENTER, "valign", GTK_ALIGN_START, NULL);
++  gtk_misc_set_alignment (GTK_MISC (image), 0.5, 0.0);
+   gtk_box_pack_start (GTK_BOX (hbox), image, FALSE, FALSE, 0);
+   gtk_widget_show (image);
+ 
+-  vbox = gtk_box_new (GTK_ORIENTATION_VERTICAL, 6);
++  vbox = gtk_vbox_new (FALSE, 6);
+   gtk_box_pack_start (GTK_BOX (hbox), vbox, TRUE, TRUE, 0);
+   gtk_widget_show (vbox);
+ 
+@@ -567,7 +560,7 @@
+   gtk_box_pack_start (GTK_BOX (vbox), label, FALSE, TRUE, 0);
+   gtk_widget_show (label);
+ 
+-  hbox = gtk_box_new (GTK_ORIENTATION_HORIZONTAL, 3);
++  hbox = gtk_hbox_new (FALSE, 3);
+   gtk_box_pack_start (GTK_BOX (vbox), hbox, FALSE, TRUE, 0);
+   gtk_widget_show (hbox);
+ 
+@@ -674,22 +667,14 @@
+   GMainLoop      *loop;
+   GdkCursor      *cursor;
+   GdkPixbuf      *icon;
+-  GIcon          *gicon = NULL;
+   GtkWidget      *image;
+   GtkWidget      *menu;
+   GtkAllocation   menu_allocation;
+   GtkWidget      *item;
+-  GtkWidget      *item_hbox;
+-  GtkWidget      *item_label;
+   GList          *helpers;
+   GList          *lp;
+   gint            icon_size;
+   GtkAllocation   chooser_allocation;
+-  gboolean        gicon_set = FALSE;
+-
+-  /* Catch button-release-event params and discard */
+-  GdkEvent       *event;
+-  gboolean        handled;
+ 
+   g_return_if_fail (EXO_IS_HELPER_CHOOSER (chooser));
+   g_return_if_fail (GTK_IS_BUTTON (button));
+@@ -697,10 +682,10 @@
+   /* set a watch cursor while loading the menu */
+   if (G_LIKELY (gtk_widget_get_window (button) != NULL))
+     {
+-      cursor = gdk_cursor_new_for_display (gdk_window_get_display (gtk_widget_get_window (button)), GDK_WATCH);
++      cursor = gdk_cursor_new (GDK_WATCH);
+       gdk_window_set_cursor (gtk_widget_get_window (button), cursor);
+-      g_object_unref (cursor);
+-      gdk_display_flush (gdk_display_get_default ());
++      gdk_cursor_unref (cursor);
++      gdk_flush ();
+     }
+ 
+   /* allocate a new menu */
+@@ -728,55 +713,40 @@
+       /* determine the helper */
+       helper = EXO_HELPER (lp->data);
+ 
+-      /* create a menu item for the helper */
+-      item_label = gtk_label_new (exo_helper_get_name (helper));
+-      g_object_set (item_label, "xalign", 0.0f, "yalign", 0.5f, NULL);
+-      item_hbox = gtk_box_new (GTK_ORIENTATION_HORIZONTAL, 6);
+-      gtk_box_pack_end (GTK_BOX (item_hbox), item_label, TRUE, TRUE, 0);
+-      item = gtk_menu_item_new ();
+-      gtk_container_add (GTK_CONTAINER (item), item_hbox);
++      /* add a menu item for the helper */
++      item = gtk_image_menu_item_new_with_label (exo_helper_get_name (helper));
++      g_object_set_data_full (G_OBJECT (item), I_("exo-helper"), helper, g_object_unref);
++      g_signal_connect (G_OBJECT (item), "activate", G_CALLBACK (menu_activate), chooser);
++      gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
++      gtk_widget_show (item);
+ 
+       /* try to load the icon for the helper */
+       icon_name = exo_helper_get_icon (helper);
+       if (G_LIKELY (icon_name != NULL))
+         {
+           /* load the icon */
+-          if (g_path_is_absolute (icon_name)) {
+-            icon = gdk_pixbuf_new_from_file_at_size (icon_name, icon_size, icon_size, NULL);
+-          }
+-          else {
+-            gicon = g_themed_icon_new_with_default_fallbacks (icon_name);
+-            gicon_set = TRUE;
+-          }
++          if (g_path_is_absolute (icon_name))
++            icon = gdk_pixbuf_new_from_file_at_scale (icon_name, icon_size, icon_size, TRUE, NULL);
++          else
++            icon = gtk_icon_theme_load_icon (icon_theme, icon_name, icon_size, 0, NULL);
+         }
+ 
+       /* fallback to application-x-executable */
+-      if (G_UNLIKELY (icon == NULL) && !gicon_set)
++      if (G_UNLIKELY (icon == NULL))
+         icon = gtk_icon_theme_load_icon (icon_theme, "application-x-executable", icon_size, 0, NULL);
+ 
+       /* fallback to gnome-mime-application-x-executable */
+-      if (G_UNLIKELY (icon == NULL) && !gicon_set)
++      if (G_UNLIKELY (icon == NULL))
+         icon = gtk_icon_theme_load_icon (icon_theme, "gnome-mime-application-x-executable", icon_size, 0, NULL);
+ 
+       /* setup the icon */
+-      if (gicon_set)
+-        {
+-          image = gtk_image_new_from_gicon (gicon, GTK_ICON_SIZE_MENU);
+-          gtk_image_set_pixel_size (GTK_IMAGE (image), icon_size);
+-          gtk_box_pack_start (GTK_BOX (item_hbox), image, FALSE, FALSE, 0);
+-        }
+-      else if (G_LIKELY (icon != NULL))
++      if (G_LIKELY (icon != NULL))
+         {
+           image = gtk_image_new_from_pixbuf (icon);
+-          gtk_box_pack_start (GTK_BOX (item_hbox), image, FALSE, FALSE, 0);
++          gtk_image_menu_item_set_image (GTK_IMAGE_MENU_ITEM (item), image);
+           g_object_unref (G_OBJECT (icon));
++          gtk_widget_show (image);
+         }
+-
+-      /* finish setting up the menu item and add it */
+-      g_object_set_data_full (G_OBJECT (item), I_("exo-helper"), helper, g_object_unref);
+-      g_signal_connect (G_OBJECT (item), "activate", G_CALLBACK (menu_activate), chooser);
+-      gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
+-      gtk_widget_show_all (item);
+     }
+ 
+   if (G_LIKELY (helpers != NULL))
+@@ -808,16 +778,12 @@
+ 
+   /* run the loop for the menu */
+   gtk_grab_add (menu);
+-#if GTK_CHECK_VERSION (3, 22, 0)
+-  gtk_menu_popup_at_widget (GTK_MENU (menu), button, GDK_GRAVITY_SOUTH_WEST, GDK_GRAVITY_NORTH_WEST, NULL);
+-#else
+   gtk_menu_popup (GTK_MENU (menu), NULL, NULL, menu_position, button, 0, gtk_get_current_event_time ());
+-#endif
+   g_main_loop_run (loop);
+   gtk_grab_remove (menu);
+   g_main_loop_unref (loop);
+ 
+-  g_signal_emit_by_name (button, "button-release-event", &event, &handled);
++  gtk_button_released (GTK_BUTTON (button));
+   g_object_unref (G_OBJECT (menu));
+ }
+ 
+--- a/exo-helper/exo-helper-launcher-dialog.c
++++ b/exo-helper/exo-helper-launcher-dialog.c
+@@ -23,7 +23,6 @@
+ #include <exo-helper/exo-helper-chooser.h>
+ #include <exo-helper/exo-helper-enum-types.h>
+ #include <exo-helper/exo-helper-launcher-dialog.h>
+-#include <gtk/gtkx.h>
+ 
+ 
+ 
+@@ -109,20 +108,21 @@
+   gtk_dialog_add_button (GTK_DIALOG (launcher_dialog), _("_Cancel"), GTK_RESPONSE_CANCEL);
+   gtk_dialog_add_button (GTK_DIALOG (launcher_dialog), _("_OK"), GTK_RESPONSE_OK);
+   gtk_dialog_set_default_response (GTK_DIALOG (launcher_dialog), GTK_RESPONSE_OK);
++  gtk_dialog_set_has_separator (GTK_DIALOG (launcher_dialog), FALSE);
+   gtk_window_set_resizable (GTK_WINDOW (launcher_dialog), FALSE);
+   gtk_window_set_title (GTK_WINDOW (launcher_dialog), _("Choose Preferred Application"));
+ 
+-  hbox = gtk_box_new (GTK_ORIENTATION_HORIZONTAL, 12);
++  hbox = gtk_hbox_new (FALSE, 12);
+   gtk_container_set_border_width (GTK_CONTAINER (hbox), 12);
+   gtk_box_pack_start (GTK_BOX (gtk_dialog_get_content_area (GTK_DIALOG (launcher_dialog))), hbox, TRUE, TRUE, 0);
+   gtk_widget_show (hbox);
+ 
+   image = gtk_image_new_from_icon_name ("preferences-desktop-default-applications", GTK_ICON_SIZE_DIALOG);
+-  g_object_set (image, "halign", GTK_ALIGN_CENTER, "valign", GTK_ALIGN_START, NULL);
++  gtk_misc_set_alignment (GTK_MISC (image), 0.5f, 0.0f);
+   gtk_box_pack_start (GTK_BOX (hbox), image, FALSE, FALSE, 0);
+   gtk_widget_show (image);
+ 
+-  vbox = gtk_box_new (GTK_ORIENTATION_VERTICAL, 12);
++  vbox = gtk_vbox_new (FALSE, 12);
+   gtk_box_pack_start (GTK_BOX (hbox), vbox, FALSE, FALSE, 0);
+   gtk_widget_show (vbox);
+ 
+--- a/exo-helper/main.c
++++ b/exo-helper/main.c
+@@ -33,7 +33,6 @@
+ #include <exo-helper/exo-helper-chooser-dialog.h>
+ #include <exo-helper/exo-helper-launcher-dialog.h>
+ #include <exo-helper/exo-helper-utils.h>
+-#include <gtk/gtkx.h>
+ 
+ 
+ 
+@@ -79,14 +78,13 @@
+ 
+   /* Align labels left */
+   children = gtk_container_get_children (GTK_CONTAINER (message_area));
+-  gtk_widget_set_halign (GTK_WIDGET (g_list_nth_data (children, 0)), GTK_ALIGN_START);
+-  gtk_widget_set_halign (GTK_WIDGET (g_list_nth_data (children, 1)), GTK_ALIGN_START);
++  gtk_misc_set_alignment (GTK_MISC (g_list_nth_data (children, 0)), 0.0, 0.5);
++  gtk_misc_set_alignment (GTK_MISC (g_list_nth_data (children, 1)), 0.0, 0.5);
+   g_list_free (children);
+ 
+   /* Enable permanently dismissing this error. */
+   check_button = gtk_check_button_new_with_mnemonic (_("Do _not show this message again"));
+-  gtk_box_pack_end (GTK_BOX (message_area), check_button, FALSE, FALSE, 0);
+-  gtk_widget_set_margin_top (check_button, 12);
++  gtk_box_pack_end (GTK_BOX (message_area), check_button, FALSE, FALSE, 12);
+   gtk_widget_show (check_button);
+ 
+   g_signal_connect (G_OBJECT (check_button), "toggled", G_CALLBACK (error_dialog_dismiss_toggled), return_value);
+@@ -113,7 +111,7 @@
+   gboolean           opt_configure = FALSE;
+   gchar             *opt_launch_type = NULL;
+   gchar             *opt_query_type = NULL;
+-  Window             opt_socket_id = 0;
++  GdkNativeWindow    opt_socket_id = 0;
+ 
+   GOptionContext    *opt_ctx;
+   GOptionGroup      *gtk_option_group;
+--- a/configure.ac
++++ b/configure.ac
+@@ -174,19 +174,19 @@
+ dnl ***********************************
+ XDT_CHECK_PACKAGE([GLIB], [glib-2.0], [2.42.0])
+ XDT_CHECK_PACKAGE([GIO], [gio-2.0], [2.42.0])
+-XDT_CHECK_PACKAGE([GTK3], [gtk+-3.0], [3.22.0])
++dnl Disable GTK3 support entirely
++dnl XDT_CHECK_PACKAGE([GTK3], [gtk+-3.0], [3.22.0])
++dnl XDT_CHECK_PACKAGE([LIBXFCE4UI2], [libxfce4ui-2], [4.12.0])
+ XDT_CHECK_PACKAGE([GTHREAD], [gthread-2.0], [2.42.0])
+ XDT_CHECK_PACKAGE([LIBXFCE4UTIL], [libxfce4util-1.0], [4.12.0])
+-XDT_CHECK_PACKAGE([LIBXFCE4UI2], [libxfce4ui-2], [4.12.0])
++XDT_CHECK_PACKAGE([LIBXFCE4UI], [libxfce4ui-1], [4.12.0])
+ XDT_CHECK_OPTIONAL_PACKAGE([GIO_UNIX], [gio-unix-2.0], [2.42.0], [gio-unix], [GIO-Unix features])
+ 
+-dnl ***********************************************************
+-dnl *** Optional support for a GTK+2 version of the library ***
+-dnl ***********************************************************
+-XDT_CHECK_OPTIONAL_PACKAGE([GTK2],
+-                           [gtk+-2.0], [2.24.0], [gtk2],
+-                           [GTK+ 2 support])
+-AM_CONDITIONAL([ENABLE_GTK2_LIBRARY], [test "x$GTK2_FOUND" = "xyes"])
++dnl *********************************************************
++dnl *** Enable support for a GTK+2 version of the library ***
++dnl *********************************************************
++XDT_CHECK_PACKAGE([GTK2], [gtk+-2.0], [2.24.0])
++AM_CONDITIONAL([ENABLE_GTK2_LIBRARY], [true])
+ 
+ dnl *********************
+ dnl *** Check for X11 ***
+@@ -254,7 +254,6 @@
+ docs/reference/version.xml
+ exo/Makefile
+ exo/exo-1.pc
+-exo/exo-2.pc
+ exo/exo-config.h
+ exo-csource/Makefile
+ exo-desktop-item-edit/Makefile
+@@ -278,9 +277,5 @@
+ echo
+ echo "* Debug Support:        $enable_debug"
+ echo "* GNU Visibility:       $have_gnuc_visibility"
+-if test x"$GTK2_FOUND" = x"yes"; then
+ echo "* GTK+ 2 Support:       yes"
+-else
+-echo "* GTK+ 2 Support:       no"
+-fi
+ echo
+--- a/exo/Makefile.am
++++ b/exo/Makefile.am
+@@ -4,12 +4,10 @@
+ 	-DDATADIR=\"$(datadir)\"					\
+ 	-DEXO_COMPILATION						\
+ 	-DG_LOG_DOMAIN=\"exo\"						\
+-	-DHELPERDIR=\"$(HELPER_PATH_PREFIX)/xfce4/exo-$(LIBEXO2_VERSION_API)\"	\
++	-DHELPERDIR=\"$(HELPER_PATH_PREFIX)/xfce4/exo-$(LIBEXO_VERSION_API)\"	\
+ 	-DLIBEXO_VERSION_API=\"$(LIBEXO_VERSION_API)\"			\
+-	-DLIBEXO2_VERSION_API=\"$(LIBEXO2_VERSION_API)\"			\
+ 	-DPACKAGE_LOCALE_DIR=\"$(localedir)\"
+ 
+-
+ libexo_headers =							\
+ 	exo-binding.h							\
+ 	exo-cell-renderer-ellipsized-text.h				\
+@@ -52,90 +50,10 @@
+ 	exo.h								\
+ 	exo-config.h
+ 
+-
+-##
+-## GTK+ 3 support library
+-##
+-
+-libexo_2_includedir = $(includedir)/exo-2/exo
+-
+-lib_LTLIBRARIES = libexo-2.la
+-
+-libexo_2_include_HEADERS =						\
+-	exo.h								\
+-	exo-binding.h							\
+-	exo-config.h							\
+-	exo-execute.h							\
+-	exo-gdk-pixbuf-extensions.h					\
+-	exo-gtk-extensions.h						\
+-	exo-gobject-extensions.h					\
+-	exo-job.h							\
+-	exo-simple-job.h						\
+-	exo-string.h							\
+-	exo-utils.h							\
+-	exo-icon-chooser-dialog.h					\
+-	exo-icon-chooser-model.h					\
+-	exo-icon-view.h							\
+-	exo-enum-types.h						\
+-	exo-toolbars-model.h						\
+-	exo-cell-renderer-icon.h					\
+-	exo-thumbnail.h							\
+-	exo-thumbnail-preview.h						\
+-	exo-tree-view.h
+-
+-libexo_2_la_SOURCES =							\
+-	$(libexo_2_include_HEADERS)					\
+-	exo-binding.c							\
+-	exo-marshal.c							\
+-	exo-marshal.h							\
+-	exo-private.c							\
+-	exo-private.h							\
+-	exo-config.c							\
+-	exo-execute.c							\
+-	exo-gdk-pixbuf-extensions.c					\
+-	exo-gtk-extensions.c						\
+-	exo-gobject-extensions.c					\
+-	exo-job.c							\
+-	exo-simple-job.c						\
+-	exo-string.c							\
+-	exo-utils.c							\
+-	exo-icon-chooser-dialog.c					\
+-	exo-icon-chooser-model.c					\
+-	exo-icon-view.c							\
+-	exo-enum-types.c						\
+-	exo-cell-renderer-icon.c					\
+-	exo-thumbnail.c							\
+-	exo-thumbnail-preview.c						\
+-	exo-tree-view.c
+-
+-libexo_2_la_CFLAGS =							\
+-	$(LIBXFCE4UTIL_CFLAGS)						\
+-	$(GIO_CFLAGS)							\
+-	$(GTK3_CFLAGS)							\
+-	$(LIBX11_CFLAGS)
+-
+-libexo_2_la_LDFLAGS =							\
+-	-export-dynamic							\
+-	-version-info $(LIBEXO_VERINFO)					\
+-	-export-symbols-regex "^[^_].*"					\
+-	-no-undefined
+-
+-libexo_2_la_LIBADD =							\
+-	$(LIBXFCE4UTIL_LIBS)						\
+-	$(GIO_LIBS)							\
+-	$(GTK3_LIBS)							\
+-	$(LIBX11_LIBS)							\
+-	-lm
+-
+ pkgconfigdir = $(libdir)/pkgconfig
+-pkgconfig_DATA = exo-2.pc
+-
+-#
+-# Gtk+ 2 support library
+-#
+-if ENABLE_GTK2_LIBRARY
++pkgconfig_DATA = exo-1.pc
+ 
+-lib_LTLIBRARIES += libexo-1.la
++lib_LTLIBRARIES = libexo-1.la
+ 
+ libexo_1_la_SOURCES =							\
+ 	$(libexoinclude_HEADERS)					\
+@@ -193,9 +111,7 @@
+ 	$(LIBXFCE4UTIL_LIBS)						\
+ 	-lm
+ 
+-pkgconfig_DATA += exo-1.pc
+ 
+-endif
+ 
+ ##
+ ## Rules to auto-generate built sources
+--- a/exo-desktop-item-edit/Makefile.am
++++ b/exo-desktop-item-edit/Makefile.am
+@@ -26,24 +26,24 @@
+ 	main.c
+ 
+ exo_desktop_item_edit_CFLAGS =						\
+-	$(GTK3_CFLAGS)							\
++	$(GTK2_CFLAGS)							\
+ 	$(GTHREAD_CFLAGS)						\
+ 	$(LIBXFCE4UTIL_CFLAGS)						\
+ 	$(GIO_CFLAGS)							\
+-	$(LIBXFCE4UI2_CFLAGS)
++	$(LIBXFCE4UI_CFLAGS)
+ 
+ exo_desktop_item_edit_LDFLAGS =						\
+ 	-no-undefined
+ 
+ exo_desktop_item_edit_DEPENDENCIES =					\
+-	$(top_builddir)/exo/libexo-2.la
++	$(top_builddir)/exo/libexo-1.la
+ 
+ exo_desktop_item_edit_LDADD =						\
+-	$(GTK3_LIBS)							\
++	$(GTK2_LIBS)							\
+ 	$(GTHREAD_LIBS)							\
+ 	$(LIBXFCE4UTIL_LIBS)						\
+ 	$(GIO_LIBS)							\
+-	$(LIBXFCE4UI2_LIBS)						\
+-	$(top_builddir)/exo/libexo-2.la
++	$(LIBXFCE4UI_LIBS)						\
++	$(top_builddir)/exo/libexo-1.la
+ 
+ # vi:set ts=8 sw=8 noet ai nocindent syntax=automake:
+--- a/exo-helper/Makefile.am
++++ b/exo-helper/Makefile.am
+@@ -9,10 +9,10 @@
+ 	-DG_LOG_DOMAIN=\"exo-helper\"					\
+ 	-DPACKAGE_LOCALE_DIR=\"$(localedir)\"
+ 
+-exo_helperdir = $(HELPER_PATH_PREFIX)/xfce4/exo-$(LIBEXO2_VERSION_API)
++exo_helperdir = $(HELPER_PATH_PREFIX)/xfce4/exo-$(LIBEXO_VERSION_API)
+ 
+ exo_helper_PROGRAMS = \
+-	exo-helper-2
++	exo-helper-1
+ 
+ exo_helper_built_sources =						\
+ 	exo-helper-enum-types.c						\
+@@ -21,7 +21,7 @@
+ exo_helper_headers =							\
+ 	exo-helper.h
+ 
+-exo_helper_2_SOURCES =						\
++exo_helper_1_SOURCES =						\
+ 	$(exo_helper_built_sources)					\
+ 	$(exo_helper_headers)						\
+ 	exo-helper-chooser-dialog.c					\
+@@ -35,28 +35,28 @@
+ 	exo-helper.c							\
+ 	main.c
+ 
+-exo_helper_2_CFLAGS =							\
+-	$(GTK3_CFLAGS)							\
++exo_helper_1_CFLAGS =							\
++	$(GTK2_CFLAGS)							\
+ 	$(GIO_UNIX_CFLAGS)							\
+ 	$(LIBXFCE4UTIL_CFLAGS)						\
+-	$(LIBXFCE4UI2_CFLAGS)
++	$(LIBXFCE4UI_CFLAGS)
+ 
+-exo_helper_2_DEPENDENCIES =						\
+-	$(top_builddir)/exo/libexo-2.la
++exo_helper_1_DEPENDENCIES =						\
++	$(top_builddir)/exo/libexo-1.la
+ 
+-exo_helper_2_LDADD =							\
+-	$(GTK3_LIBS)							\
++exo_helper_1_LDADD =							\
++	$(GTK2_LIBS)							\
+ 	$(GIO_UNIX_LIBS)							\
+ 	$(LIBXFCE4UTIL_LIBS)						\
+-	$(LIBXFCE4UI2_LIBS)						\
+-	$(top_builddir)/exo/libexo-2.la
++	$(LIBXFCE4UI_LIBS)						\
++	$(top_builddir)/exo/libexo-1.la
+ 
+ bin_SCRIPTS =								\
+ 	exo-preferred-applications
+ 
+ exo-preferred-applications: Makefile $(srcdir)/exo-preferred-applications.in
+-	sed -e 's,@HELPERDIR\@,$(HELPER_PATH_PREFIX)/xfce4/exo-$(LIBEXO2_VERSION_API),g' \
+-	    -e 's,@LIBEXO2_VERSION_API\@,$(LIBEXO2_VERSION_API),g' 	\
++	sed -e 's,@HELPERDIR\@,$(HELPER_PATH_PREFIX)/xfce4/exo-$(LIBEXO_VERSION_API),g' \
++	    -e 's,@LIBEXO_VERSION_API\@,$(LIBEXO_VERSION_API),g' 	\
+ 	    < $(srcdir)/exo-preferred-applications.in			\
+ 	    > exo-preferred-applications
+ 
+--- a/exo-helper/exo-preferred-applications.in
++++ b/exo-helper/exo-preferred-applications.in
+@@ -8,4 +8,4 @@
+ # Browser, Mail Reader and Terminal Emulator.
+ #
+ 
+-exec @HELPERDIR@/exo-helper-@LIBEXO2_VERSION_API@ --configure "$@"
++exec @HELPERDIR@/exo-helper-@LIBEXO_VERSION_API@ --configure "$@"
+--- a/exo-open/Makefile.am
++++ b/exo-open/Makefile.am
+@@ -11,7 +11,7 @@
+ 	main.c
+ 
+ exo_open_CFLAGS =							\
+-	$(GTK3_CFLAGS)							\
++	$(GTK2_CFLAGS)							\
+ 	$(LIBXFCE4UTIL_CFLAGS)						\
+ 	$(GIO_CFLAGS)							\
+ 	$(GIO_UNIX_CFLAGS)
+@@ -20,11 +20,11 @@
+ 	-no-undefined
+ 
+ exo_open_LDADD =							\
+-	$(GTK3_LIBS)							\
++	$(GTK2_LIBS)							\
+ 	$(LIBXFCE4UTIL_LIBS)						\
+ 	$(GIO_LIBS)							\
+ 	$(GIO_UNIX_LIBS)						\
+-	$(top_builddir)/exo/libexo-2.la
++	$(top_builddir)/exo/libexo-1.la
+ 
+ desktopdir = $(datadir)/applications
+ desktop_in_files =							\
+--- a/tests/Makefile.am
++++ b/tests/Makefile.am
+@@ -16,7 +16,6 @@
+ 	test-exo-noop							\
+ 	test-exo-string							\
+ 	test-exo-icon-chooser-dialog					\
+-	test-exo-icon-chooser-dialog-gtk3					\
+ 	test-exo-wrap-table
+ 
+ test_exo_csource_SOURCES =						\
+@@ -71,20 +70,6 @@
+ 	$(GTK2_LIBS)							\
+ 	$(top_builddir)/exo/libexo-$(LIBEXO_VERSION_API).la
+ 
+-test_exo_icon_chooser_dialog_gtk3_SOURCES =					\
+-	test-exo-icon-chooser-dialog.c
+-
+-test_exo_icon_chooser_dialog_gtk3_CFLAGS =					\
+-	$(GTK3_CFLAGS)							\
+-	$(LIBXFCE4UTIL_CFLAGS)
+-
+-test_exo_icon_chooser_dialog_gtk3_DEPENDENCIES =				\
+-	$(top_builddir)/exo/libexo-2.la
+-
+-test_exo_icon_chooser_dialog_gtk3_LDADD =					\
+-	$(GTK3_LIBS)							\
+-	$(top_builddir)/exo/libexo-2.la
+-
+ test_exo_wrap_table_SOURCES =						\
+ 	test-exo-wrap-table.c
+ 
+--- a/exo/exo-execute.c
++++ b/exo/exo-execute.c
+@@ -139,7 +139,7 @@
+   g_return_val_if_fail (error == NULL || *error == NULL, FALSE);
+ 
+   /* generate the argument vector */
+-  argv[argc++] = HELPERDIR G_DIR_SEPARATOR_S "exo-helper-" LIBEXO2_VERSION_API;
++  argv[argc++] = HELPERDIR G_DIR_SEPARATOR_S "exo-helper-" LIBEXO_VERSION_API;
+   argv[argc++] = "--launch";
+   argv[argc++] = (gchar *) category;
+ 
+--- a/exo-desktop-item-edit/main.c
++++ b/exo-desktop-item-edit/main.c
+@@ -130,6 +130,7 @@
+   GtkWidget       *chooser;
+   GtkWidget       *message;
+   GtkWidget       *button;
++  GtkWidget       *bbox;
+   GtkWidget       *dialog;
+   GtkWidget       *editor;
+   GKeyFile        *key_file;
+@@ -329,7 +330,9 @@
+   gtk_window_set_icon_name (GTK_WINDOW (dialog), ICON_NAMES[mode]);
+ 
+   button = gtk_button_new_with_mnemonic (_("_Help"));
+-  exo_gtk_dialog_add_secondary_button(GTK_DIALOG (dialog), GTK_WIDGET (button));
++  bbox = gtk_dialog_get_action_area (GTK_DIALOG (dialog));
++  gtk_box_pack_start (GTK_BOX (bbox), button, FALSE, FALSE, 0);
++  gtk_button_box_set_child_secondary (GTK_BUTTON_BOX (bbox), button, TRUE);
+   g_signal_connect (G_OBJECT (button), "clicked",
+       G_CALLBACK (exo_die_help), dialog);
+   gtk_widget_show (button);
+@@ -422,7 +425,7 @@
+   if (G_UNLIKELY (opt_xid != 0))
+     {
+       /* try to determine the window for the id */
+-      xwindow = gdk_x11_window_foreign_new_for_display (gdk_display_get_default(), opt_xid);
++      xwindow = gdk_window_foreign_new ((GdkNativeWindow) opt_xid);
+       if (G_LIKELY (xwindow != NULL))
+         {
+           GtkAllocation allocation;
+@@ -433,11 +436,11 @@
+           /* ...and set the "transient for" relation */
+           gdk_window_set_transient_for (gtk_widget_get_window (dialog), xwindow);
+           gtk_window_set_screen (GTK_WINDOW (dialog),
+-              gdk_window_get_screen (GDK_WINDOW (xwindow)));
++              gdk_drawable_get_screen (GDK_DRAWABLE (xwindow)));
+ 
+           /* center on parent */
+           gdk_window_get_root_origin (xwindow, &ox, &oy);
+-          gdk_window_get_geometry (xwindow, NULL, NULL, &ow, &oh);
++          gdk_window_get_geometry (xwindow, NULL, NULL, &ow, &oh, NULL);
+ 
+           gtk_widget_get_allocation (dialog, &allocation);
+           ox += (ow - allocation.width) / 2;
+--- a/exo-helper/exo-helper-chooser-dialog.c
++++ b/exo-helper/exo-helper-chooser-dialog.c
+@@ -134,7 +134,7 @@
+      Internet
+    */
+   label = gtk_label_new_with_mnemonic (_("_Internet"));
+-  vbox = g_object_new (GTK_TYPE_BOX, "orientation", GTK_ORIENTATION_VERTICAL, "border-width", 12, "spacing", 18, NULL);
++  vbox = g_object_new (GTK_TYPE_VBOX, "border-width", 12, "spacing", 24, NULL);
+   gtk_notebook_append_page (GTK_NOTEBOOK (notebook), vbox, label);
+   gtk_widget_show (label);
+   gtk_widget_show (vbox);
+@@ -150,7 +150,7 @@
+   gtk_frame_set_label_widget (GTK_FRAME (frame), label);
+   gtk_widget_show (label);
+ 
+-  box = g_object_new (GTK_TYPE_BOX, "orientation", GTK_ORIENTATION_VERTICAL, "margin-top", 6, "margin-left", 12, "spacing", 6, NULL);
++  box = g_object_new (GTK_TYPE_VBOX, "border-width", 12, "spacing", 12, NULL);
+   gtk_container_add (GTK_CONTAINER (frame), box);
+   gtk_widget_show (box);
+ 
+@@ -181,7 +181,7 @@
+   gtk_frame_set_label_widget (GTK_FRAME (frame), label);
+   gtk_widget_show (label);
+ 
+-  box = g_object_new (GTK_TYPE_BOX, "orientation", GTK_ORIENTATION_VERTICAL, "margin-top", 6, "margin-left", 12, "spacing", 6, NULL);
++  box = g_object_new (GTK_TYPE_VBOX, "border-width", 12, "spacing", 12, NULL);
+   gtk_container_add (GTK_CONTAINER (frame), box);
+   gtk_widget_show (box);
+ 
+@@ -205,7 +205,7 @@
+      Utilities
+    */
+   label = gtk_label_new_with_mnemonic (_("_Utilities"));
+-  vbox = g_object_new (GTK_TYPE_BOX, "orientation", GTK_ORIENTATION_VERTICAL, "border-width", 12, "spacing", 18, NULL);
++  vbox = g_object_new (GTK_TYPE_VBOX, "border-width", 12, "spacing", 24, NULL);
+   gtk_notebook_append_page (GTK_NOTEBOOK (notebook), vbox, label);
+   gtk_widget_show (label);
+   gtk_widget_show (vbox);
+@@ -221,7 +221,7 @@
+   gtk_frame_set_label_widget (GTK_FRAME (frame), label);
+   gtk_widget_show (label);
+ 
+-  box = g_object_new (GTK_TYPE_BOX, "orientation", GTK_ORIENTATION_VERTICAL, "margin-top", 6, "margin-left", 12, "spacing", 6, NULL);
++  box = g_object_new (GTK_TYPE_VBOX, "border-width", 12, "spacing", 12, NULL);
+   gtk_container_add (GTK_CONTAINER (frame), box);
+   gtk_widget_show (box);
+ 
+@@ -252,7 +252,7 @@
+   gtk_frame_set_label_widget (GTK_FRAME (frame), label);
+   gtk_widget_show (label);
+ 
+-  box = g_object_new (GTK_TYPE_BOX, "orientation", GTK_ORIENTATION_VERTICAL, "margin-top", 6, "margin-left", 12, "spacing", 6, NULL);
++  box = g_object_new (GTK_TYPE_VBOX, "border-width", 12, "spacing", 12, NULL);
+   gtk_container_add (GTK_CONTAINER (frame), box);
+   gtk_widget_show (box);
+ 
+--- a/exo-desktop-item-edit/exo-die-command-entry.c
++++ b/exo-desktop-item-edit/exo-die-command-entry.c
+@@ -77,7 +77,7 @@
+ 
+ 
+ 
+-G_DEFINE_TYPE (ExoDieCommandEntry, exo_die_command_entry, GTK_TYPE_BOX)
++G_DEFINE_TYPE (ExoDieCommandEntry, exo_die_command_entry, GTK_TYPE_HBOX)
+ 
+ 
+ 
+@@ -135,7 +135,6 @@
+   GtkWidget *image;
+ 
+   /* setup the box */
+-  gtk_orientable_set_orientation (GTK_ORIENTABLE (command_entry), GTK_ORIENTATION_HORIZONTAL);
+   gtk_box_set_spacing (GTK_BOX (command_entry), 6);
+ 
+   /* allocate the command model */

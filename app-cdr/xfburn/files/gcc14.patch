@@ -1,0 +1,30 @@
+--- a/xfburn/xfburn-main.c
++++ b/xfburn/xfburn-main.c
+@@ -129,13 +129,10 @@
+     return xfce_get_homedir ();
+ }
+ 
+-const gboolean *
+-xfburn_main_has_initial_dir ()
++gboolean
++xfburn_main_has_initial_dir (void)
+ {
+-  if (initial_dir)
+-    return TRUE;
+-  else
+-    return FALSE;
++    return initial_dir != NULL;
+ }
+ 
+ 
+--- a/xfburn/xfburn-main.h
++++ b/xfburn/xfburn-main.h
+@@ -28,7 +28,7 @@
+ void xfburn_main_leave_window (void);
+ void xfburn_main_enter_window (void);
+ const gchar *xfburn_main_get_initial_dir ();
+-const gboolean *xfburn_main_has_initial_dir ();
++gboolean xfburn_main_has_initial_dir (void);
+ 
+ G_END_DECLS
+ #endif /* __XFBURN_MAIN_H__ */

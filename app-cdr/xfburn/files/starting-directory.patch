@@ -1,0 +1,264 @@
+From fe7390cd3b84eb936ae6b7c786dddbc4338012fe Mon Sep 17 00:00:00 2001
+From: René Vögeli <rvoegeli@rangee.com>
+Date: Sun, 28 Apr 2019 22:55:57 +0200
+Subject: [PATCH] Add an option to set the starting directory on launch
+
+- Add --directory option to set the starting directory instead of home
+---
+ xfburn/xfburn-audio-composition.c |  5 ++++
+ xfburn/xfburn-burn-image-dialog.c |  4 +++
+ xfburn/xfburn-data-composition.c  |  6 +++++
+ xfburn/xfburn-fs-browser.c        | 41 +++++++++++++++++++++++++++----
+ xfburn/xfburn-main.c              | 20 +++++++--------
+ xfburn/xfburn-main.h              |  3 +--
+ xfburn/xfburn-utils.c             |  6 +++++
+ 7 files changed, 68 insertions(+), 17 deletions(-)
+
+diff --git a/xfburn/xfburn-audio-composition.c b/xfburn/xfburn-audio-composition.c
+index dcb2e787..d1fda583 100644
+--- a/xfburn/xfburn-audio-composition.c
++++ b/xfburn/xfburn-audio-composition.c
+@@ -53,6 +53,7 @@
+ #include "xfburn-burn-audio-cd-composition-dialog.h"
+ #include "xfburn-transcoder.h"
+ #include "xfburn-settings.h"
++#include "xfburn-main.h"
+ 
+ #define XFBURN_AUDIO_COMPOSITION_GET_PRIVATE(obj) (G_TYPE_INSTANCE_GET_PRIVATE ((obj), XFBURN_TYPE_AUDIO_COMPOSITION, XfburnAudioCompositionPrivate))
+ 
+@@ -981,6 +982,10 @@ action_add_selected_files (GtkAction *action, XfburnAudioComposition *dc)
+                                           NULL);
+     gtk_file_chooser_set_select_multiple (GTK_FILE_CHOOSER(dialog), TRUE);
+ 
++    if(xfburn_main_has_initial_dir ()) {
++      gtk_file_chooser_set_current_folder (GTK_FILE_CHOOSER (dialog), xfburn_main_get_initial_dir ());
++    }
++
+     if (gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_ACCEPT) {
+         GSList *list = gtk_file_chooser_get_filenames (GTK_FILE_CHOOSER (dialog));
+         GString  * str = g_string_new(NULL);
+diff --git a/xfburn/xfburn-burn-image-dialog.c b/xfburn/xfburn-burn-image-dialog.c
+index fcf4caf2..b562e65d 100644
+--- a/xfburn/xfburn-burn-image-dialog.c
++++ b/xfburn/xfburn-burn-image-dialog.c
+@@ -180,6 +180,10 @@ xfburn_burn_image_dialog_init (XfburnBurnImageDialog * obj)
+   gtk_file_chooser_add_filter (GTK_FILE_CHOOSER (priv->chooser_image), filter);
+   gtk_file_chooser_set_filter (GTK_FILE_CHOOSER (priv->chooser_image), filter);
+ 
++  if(xfburn_main_has_initial_dir ()) {
++    gtk_file_chooser_set_current_folder (GTK_FILE_CHOOSER (priv->chooser_image), xfburn_main_get_initial_dir ());
++  }
++
+   if (last_file) {
+     gtk_file_chooser_set_filename (GTK_FILE_CHOOSER (priv->chooser_image), last_file);
+   }
+diff --git a/xfburn/xfburn-data-composition.c b/xfburn/xfburn-data-composition.c
+index 4444f25a..8a8962c5 100644
+--- a/xfburn/xfburn-data-composition.c
++++ b/xfburn/xfburn-data-composition.c
+@@ -55,6 +55,7 @@
+ #include "xfburn-main-window.h"
+ #include "xfburn-utils.h"
+ #include "xfburn-settings.h"
++#include "xfburn-main.h"
+ 
+ #define XFBURN_DATA_COMPOSITION_GET_PRIVATE(obj) (G_TYPE_INSTANCE_GET_PRIVATE ((obj), XFBURN_TYPE_DATA_COMPOSITION, XfburnDataCompositionPrivate))
+ 
+@@ -951,6 +952,11 @@ select_files (XfburnDataComposition * dc)
+     priv->add_filechooser = gtk_file_chooser_widget_new (GTK_FILE_CHOOSER_ACTION_OPEN);
+ 
+     gtk_file_chooser_set_select_multiple (GTK_FILE_CHOOSER(priv->add_filechooser), TRUE);
++
++    if(xfburn_main_has_initial_dir ()) {
++      gtk_file_chooser_set_current_folder (GTK_FILE_CHOOSER(priv->add_filechooser), xfburn_main_get_initial_dir ());
++    }
++
+     if (priv->last_directory)
+       gtk_file_chooser_set_current_folder (GTK_FILE_CHOOSER(priv->add_filechooser), priv->last_directory);
+ 
+diff --git a/xfburn/xfburn-fs-browser.c b/xfburn/xfburn-fs-browser.c
+index 221e288b..550033ca 100644
+--- a/xfburn/xfburn-fs-browser.c
++++ b/xfburn/xfburn-fs-browser.c
+@@ -30,6 +30,8 @@
+ #include "xfburn-data-composition.h"
+ #include "xfburn-utils.h"
+ #include "xfburn-settings.h"
++#include "xfburn-main.h"
++
+ 
+ /* prototypes */
+ static void xfburn_fs_browser_class_init (XfburnFsBrowserClass * klass);
+@@ -243,7 +245,7 @@ void
+ xfburn_fs_browser_refresh (XfburnFsBrowser * browser)
+ {
+   GtkTreeModel *model;
+-  GtkTreeIter iter_home, iter_root;
++  GtkTreeIter iter_initial, iter_home, iter_root;
+   int x, y;
+   gchar *text;
+   GdkScreen *screen;
+@@ -258,6 +260,26 @@ xfburn_fs_browser_refresh (XfburnFsBrowser * browser)
+ 
+   gtk_icon_size_lookup (GTK_ICON_SIZE_SMALL_TOOLBAR, &x, &y);
+ 
++  /* load the initial dir, if set */
++  if (xfburn_main_has_initial_dir ()) {
++    text = g_path_get_basename (xfburn_main_get_initial_dir ());
++
++    screen = gtk_widget_get_screen (GTK_WIDGET (browser));
++    icon_theme = gtk_icon_theme_get_for_screen (screen);
++    icon = gtk_icon_theme_load_icon (icon_theme, "gnome-fs-directory", x, 0, NULL);
++
++    gtk_tree_store_append (GTK_TREE_STORE (model), &iter_initial, NULL);
++    gtk_tree_store_set (GTK_TREE_STORE (model), &iter_initial,
++                        FS_BROWSER_COLUMN_ICON, icon,
++                        FS_BROWSER_COLUMN_DIRECTORY, text, FS_BROWSER_COLUMN_PATH, xfburn_main_get_initial_dir (), -1);
++    if (icon)
++      g_object_unref (icon);
++    g_free (text);
++
++    load_directory_in_browser (browser, xfburn_main_get_initial_dir (), &iter_initial);
++  }
++
++
+   /* load the user's home dir */
+   text = g_strdup_printf (_("%s's home"), g_get_user_name ());
+ 
+@@ -288,10 +310,19 @@ xfburn_fs_browser_refresh (XfburnFsBrowser * browser)
+ 
+   /* set cursor on home dir row */
+   selection = gtk_tree_view_get_selection (GTK_TREE_VIEW (browser));
+-  gtk_tree_selection_select_iter (selection, &iter_home);
+-
+-  /* expand the home dir row */
+-  path = gtk_tree_model_get_path (model, &iter_home);
++  if (xfburn_main_has_initial_dir ()) {
++    /* set cursor on initial dir row */
++    gtk_tree_selection_select_iter (selection, &iter_initial);
++
++    /* expand the initial dir row */
++    path = gtk_tree_model_get_path (model, &iter_initial);
++  } else {
++    /* set cursor on home dir row */
++    gtk_tree_selection_select_iter (selection, &iter_home);
++
++    /* expand the home dir row */
++    path = gtk_tree_model_get_path (model, &iter_home);
++  }
+   gtk_tree_view_expand_row (GTK_TREE_VIEW (browser), path, FALSE);
+   gtk_tree_path_free (path);
+ }
+diff --git a/xfburn/xfburn-main.c b/xfburn/xfburn-main.c
+index 279028b1..0b9b9e0a 100644
+--- a/xfburn/xfburn-main.c
++++ b/xfburn/xfburn-main.c
+@@ -68,9 +68,7 @@ static gboolean add_data_composition = FALSE;
+ static gboolean add_audio_composition = FALSE;
+ static gboolean blank = FALSE;
+ static gchar *transcoder_selection = NULL;
+-#if 0 /* INITIAL_DIRECTORY_OPTION */
+ static gchar *initial_dir = NULL;
+-#endif
+ 
+ static GOptionEntry optionentries[] = {
+   { "burn-image", 'i', G_OPTION_FLAG_OPTIONAL_ARG /* || G_OPTION_FLAG_FILENAME */, G_OPTION_ARG_CALLBACK, &parse_option, 
+@@ -83,11 +81,8 @@ static GOptionEntry optionentries[] = {
+     "Start an audio composition, optionally followed by files/directories to be added to the composition", NULL },
+   { "transcoder", 't', 0, G_OPTION_ARG_STRING, &transcoder_selection, 
+     "Select the transcoder, run with --transcoder=list to see the available ones", NULL },
+-#if 0 /* INITIAL_DIRECTORY_OPTION */
+-/* Implementing this does not seem worth the effort */
+   { "directory", 'D', G_OPTION_FLAG_OPTIONAL_ARG , G_OPTION_ARG_CALLBACK, &parse_option, 
+     "Start the file browser in the specified directory, or the current directory if none is specified (the default is to start in your home directory)", NULL },
+-#endif
+   { "version", 'V', 0 , G_OPTION_ARG_NONE, &show_version, 
+     "Display program version and exit", NULL },
+   { "main", 'm', 0, G_OPTION_ARG_NONE, &show_main, 
+@@ -124,7 +119,7 @@ xfburn_main_enter_main_window (void)
+   window_counter = -42;
+ }
+ 
+-#if 0 /* INITIAL_DIRECTORY_OPTION */
++
+ const gchar *
+ xfburn_main_get_initial_dir ()
+ {
+@@ -133,7 +128,15 @@ xfburn_main_get_initial_dir ()
+   else
+     return xfce_get_homedir ();
+ }
+-#endif
++
++const gboolean *
++xfburn_main_has_initial_dir ()
++{
++  if (initial_dir)
++    return TRUE;
++  else
++    return FALSE;
++}
+ 
+ 
+ /* private functions */
+@@ -152,13 +155,11 @@ static gboolean parse_option (const gchar *option_name, const gchar *value,
+     add_audio_composition = TRUE;
+   } else if (strcmp (option_name, "-b") == 0 || strcmp (option_name, "--blank") == 0) {
+     blank = TRUE;
+-#if 0 /* INITIAL_DIRECTORY_OPTION */
+   } else if (strcmp (option_name, "-D") == 0 || strcmp (option_name, "--directory") == 0) {
+     if (value == NULL)
+       initial_dir = g_get_current_dir ();
+     else
+       initial_dir = g_strdup(value);
+-#endif
+   } else {
+     g_set_error (error, 0, G_OPTION_ERROR_FAILED, "Invalid command line option. Please report, this is a bug.");
+     return FALSE;
+@@ -349,7 +350,6 @@ main (int argc, char **argv)
+     add_data_composition = TRUE;
+   }
+ 
+-
+   if (show_main) {
+     xfburn_main_enter_main_window ();
+   }
+diff --git a/xfburn/xfburn-main.h b/xfburn/xfburn-main.h
+index 69a421c0..1121b53f 100644
+--- a/xfburn/xfburn-main.h
++++ b/xfburn/xfburn-main.h
+@@ -27,9 +27,8 @@ G_BEGIN_DECLS
+ 
+ void xfburn_main_leave_window (void);
+ void xfburn_main_enter_window (void);
+-#if 0 /* INITIAL_DIRECTORY_OPTION */
+ const gchar *xfburn_main_get_initial_dir ();
+-#endif
++const gboolean *xfburn_main_has_initial_dir ();
+ 
+ G_END_DECLS
+ #endif /* __XFBURN_MAIN_H__ */
+diff --git a/xfburn/xfburn-utils.c b/xfburn/xfburn-utils.c
+index f6462aba..9862e384 100644
+--- a/xfburn/xfburn-utils.c
++++ b/xfburn/xfburn-utils.c
+@@ -35,6 +35,7 @@
+ #include "xfburn-utils.h"
+ #include "xfburn-settings.h"
+ #include "xfburn-device-list.h"
++#include "xfburn-main.h"
+ 
+ /***********/
+ /* cursors */
+@@ -129,6 +130,11 @@ xfburn_browse_for_file (GtkEntry *entry, GtkWindow *parent)
+ 
+   dialog = gtk_file_chooser_dialog_new (_("Select command"), parent, GTK_FILE_CHOOSER_ACTION_SAVE, GTK_STOCK_CANCEL,
+                                         GTK_RESPONSE_CANCEL, GTK_STOCK_SAVE, GTK_RESPONSE_ACCEPT, NULL);
++
++  if(xfburn_main_has_initial_dir ()) {
++    gtk_file_chooser_set_current_folder (GTK_FILE_CHOOSER (dialog), xfburn_main_get_initial_dir ());
++  }
++
+   if (strlen (text) > 0)
+     gtk_file_chooser_set_filename (GTK_FILE_CHOOSER (dialog), text);
+   

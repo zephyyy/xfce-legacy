@@ -1,0 +1,25 @@
+From 9e3ea264e216f21dee7f0efa64dd1a30bbce12c4 Mon Sep 17 00:00:00 2001
+From: Hunter Turcin <huntertur@gmail.com>
+Date: Sun, 30 Jan 2022 15:48:46 -0600
+Subject: [PATCH] Rename "SSH" to "SSH / SFTP"
+
+---
+ src/common.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/common.c b/src/common.c
+index 4a1b668..d4b8100 100644
+--- a/src/common.c
++++ b/src/common.c
+@@ -82,7 +82,7 @@ const gchar *gigolo_describe_scheme(const gchar *scheme)
+ 	else if (gigolo_str_equal(scheme, "http"))
+ 		return _("HTTP");
+ 	else if (gigolo_str_equal(scheme, "sftp"))
+-		return _("SSH");
++		return _("SSH / SFTP");
+ 	else if (gigolo_str_equal(scheme, "obex"))
+ 		return _("Obex");
+ 	else if (gigolo_str_equal(scheme, "dav"))
+-- 
+GitLab
+

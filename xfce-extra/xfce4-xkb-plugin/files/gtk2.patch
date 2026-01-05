@@ -1,0 +1,491 @@
+diff --git a/configure.ac b/configure.ac
+index 5551aff..7abb9aa 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -74,14 +74,14 @@ XDT_I18N([@LINGUAS@])
+ dnl ***********************************
+ dnl *** Check for required packages ***
+ dnl ***********************************
+-XDT_CHECK_PACKAGE([GTK], [gtk+-3.0], [3.20.0])
+-XDT_CHECK_PACKAGE([LIBXFCE4PANEL], [libxfce4panel-2.0], [4.12.0])
++XDT_CHECK_PACKAGE([GTK], [gtk+-2.0], [2.22.0])
++XDT_CHECK_PACKAGE([LIBXFCE4PANEL], [libxfce4panel-1.0], [4.12.0])
+ XDT_CHECK_PACKAGE([LIBXFCE4UTIL], [libxfce4util-1.0], [4.12.0])
+-XDT_CHECK_PACKAGE([LIBXFCE4UI], [libxfce4ui-2], [4.12.0])
++XDT_CHECK_PACKAGE([LIBXFCE4UI], [libxfce4ui-1], [4.12.0])
+ XDT_CHECK_PACKAGE([XFCONF], [libxfconf-0], [4.12.1])
+ XDT_CHECK_PACKAGE([LIBXKLAVIER], [libxklavier], [5.3])
+ XDT_CHECK_PACKAGE([LIBRSVG], [librsvg-2.0], [2.40])
+-XDT_CHECK_PACKAGE([LIBWNCK], [libwnck-3.0], [3.14])
++XDT_CHECK_PACKAGE([LIBWNCK], [libwnck-1.0], [2.31])
+ XDT_CHECK_PACKAGE([GARCON], [garcon-1], [0.4.0])
+ 
+ dnl ***********************************
+diff --git a/panel-plugin/xkb-cairo.c b/panel-plugin/xkb-cairo.c
+index 1cc5174..47b4d57 100644
+--- a/panel-plugin/xkb-cairo.c
++++ b/panel-plugin/xkb-cairo.c
+@@ -146,7 +146,7 @@ xkb_cairo_draw_label (cairo_t     *cr,
+                       gint         actual_height,
+                       gint         variant_markers_count,
+                       guint        scale,
+-                      GdkRGBA      rgba)
++                      GdkColor    *color)
+ {
+   gchar                *normalized_group_name;
+   gint                  pango_width, pango_height;
+@@ -173,7 +173,7 @@ xkb_cairo_draw_label (cairo_t     *cr,
+   pango_layout_set_font_description (layout, desc);
+   pango_font_description_free (desc);
+ 
+-  gdk_cairo_set_source_rgba (cr, &rgba);
++  gdk_cairo_set_source_color (cr, color);
+   pango_layout_get_pixel_size (layout, &pango_width, &pango_height);
+   DBG ("pango_width/height: %d/%d", pango_width, pango_height);
+ 
+@@ -233,7 +233,7 @@ xkb_cairo_draw_label_system (cairo_t                    *cr,
+                              gint                        variant_markers_count,
+                              gboolean                    caps_lock_enabled,
+                              const PangoFontDescription *desc,
+-                             GdkRGBA                     rgba)
++                             GdkColor                   *color)
+ {
+   gchar       *normalized_group_name;
+   gint         pango_width, pango_height;
+@@ -255,7 +255,7 @@ xkb_cairo_draw_label_system (cairo_t                    *cr,
+   pango_layout_set_text (layout, normalized_group_name, -1);
+   pango_layout_set_font_description (layout, desc);
+ 
+-  gdk_cairo_set_source_rgba (cr, &rgba);
++  gdk_cairo_set_source_color (cr, color);
+   pango_layout_get_pixel_size (layout, &pango_width, &pango_height);
+   DBG ("pango_width/height: %d/%d", pango_width, pango_height);
+ 
+diff --git a/panel-plugin/xkb-cairo.h b/panel-plugin/xkb-cairo.h
+index 87b54b9..1975243 100644
+--- a/panel-plugin/xkb-cairo.h
++++ b/panel-plugin/xkb-cairo.h
+@@ -44,7 +44,7 @@ void        xkb_cairo_draw_label            (cairo_t                        *cr,
+                                              gint                            actual_height,
+                                              gint                            variant_markers_count,
+                                              guint                           scale,
+-                                             GdkRGBA                         rgba);
++                                             GdkColor                       *color);
+ 
+ void        xkb_cairo_draw_label_system     (cairo_t                        *cr,
+                                              const gchar                    *group_name,
+@@ -53,6 +53,6 @@ void        xkb_cairo_draw_label_system     (cairo_t                        *cr,
+                                              gint                            variant_markers_count,
+                                              gboolean                        caps_lock_enabled,
+                                              const PangoFontDescription     *desc,
+-                                             GdkRGBA                         rgba);
++                                             GdkColor                       *color);
+ 
+ #endif
+diff --git a/panel-plugin/xkb-dialog.c b/panel-plugin/xkb-dialog.c
+index 67ff164..cc2c6d6 100644
+--- a/panel-plugin/xkb-dialog.c
++++ b/panel-plugin/xkb-dialog.c
+@@ -86,6 +86,14 @@ xkb_dialog_set_style_warning_tooltip (GtkWidget *widget,
+ 
+ 
+ 
++#define gtk_table_attach_magic(widget, left, right) \
++gtk_table_attach (GTK_TABLE (table), widget, left, right, \
++                  table_vertical, table_vertical + 1, GTK_EXPAND | GTK_FILL, 0, 0, 0)
++#define gtk_table_attach_magic0(widget) gtk_table_attach_magic (widget, 0, 1)
++#define gtk_table_attach_magic1(widget) gtk_table_attach_magic (widget, 1, 3)
++
++
++
+ void
+ xkb_dialog_configure_plugin (XfcePanelPlugin *plugin,
+                              XkbXfconf       *config)
+@@ -97,8 +105,8 @@ xkb_dialog_configure_plugin (XfcePanelPlugin *plugin,
+   GtkWidget *caps_lock_indicator_switch;
+   GtkWidget *display_tooltip_icon_switch;
+   GtkWidget *group_policy_combo;
+-  GtkWidget *vbox, *frame, *bin, *grid, *label;
+-  gint       grid_vertical;
++  GtkWidget *vbox, *frame, *bin, *table, *label, *alignment;
++  gint       table_vertical;
+ 
+   xfce_panel_plugin_block_menu (plugin);
+ 
+@@ -107,13 +115,12 @@ xkb_dialog_configure_plugin (XfcePanelPlugin *plugin,
+                                                          GTK_RESPONSE_OK, NULL);
+   gtk_window_set_icon_name (GTK_WINDOW (settings_dialog), "xfce4-settings");
+ 
+-  vbox = gtk_box_new (GTK_ORIENTATION_VERTICAL, 18);
+-  gtk_box_set_homogeneous (GTK_BOX (vbox), FALSE);
++  vbox = gtk_vbox_new (FALSE, 18);
+   gtk_container_set_border_width (GTK_CONTAINER (vbox), 10);
+   gtk_widget_show (vbox);
+   gtk_container_add (GTK_CONTAINER (gtk_dialog_get_content_area (GTK_DIALOG (settings_dialog))), vbox);
+ 
+-  grid_vertical = 0;
++  table_vertical = 0;
+ 
+   frame = xfce_gtk_frame_box_new (_("Appearance"), &bin);
+   G_GNUC_BEGIN_IGNORE_DEPRECATIONS
+@@ -121,76 +128,68 @@ xkb_dialog_configure_plugin (XfcePanelPlugin *plugin,
+   G_GNUC_END_IGNORE_DEPRECATIONS
+   gtk_box_pack_start (GTK_BOX (vbox), frame, TRUE, TRUE, 0);
+ 
+-  grid = gtk_grid_new ();
+-  gtk_grid_set_row_spacing (GTK_GRID (grid), 6);
+-  gtk_grid_set_column_spacing (GTK_GRID (grid), 12);
+-  gtk_grid_set_row_homogeneous (GTK_GRID (grid), TRUE);
+-  gtk_widget_set_size_request (grid, -1, -1);
+-  gtk_container_add (GTK_CONTAINER (bin), grid);
++  table = gtk_table_new (0, 3, TRUE);
++  gtk_table_set_row_spacings (GTK_TABLE (table), 6);
++  gtk_table_set_col_spacings (GTK_TABLE (table), 12);
++  gtk_container_add (GTK_CONTAINER (bin), table);
+ 
+   label = gtk_label_new (_("Show layout as:"));
+-  gtk_label_set_xalign (GTK_LABEL (label), 0.f);
+-  gtk_widget_set_hexpand (label, TRUE);
+-  gtk_grid_attach (GTK_GRID (grid), label, 0, grid_vertical, 1, 1);
++  gtk_misc_set_alignment (GTK_MISC (label), 0.f, 0.f);
++  gtk_table_attach_magic0 (label);
+ 
+   display_type_combo = gtk_combo_box_text_new ();
+   gtk_combo_box_text_append_text (GTK_COMBO_BOX_TEXT (display_type_combo), _("image"));
+   gtk_combo_box_text_append_text (GTK_COMBO_BOX_TEXT (display_type_combo), _("text"));
+   gtk_combo_box_text_append_text (GTK_COMBO_BOX_TEXT (display_type_combo), _("system"));
+   gtk_widget_set_size_request (display_type_combo, 230, -1);
+-  gtk_grid_attach (GTK_GRID (grid), display_type_combo, 1, grid_vertical, 1, 1);
++  gtk_table_attach_magic1 (display_type_combo);
+ 
+-  grid_vertical++;
++  table_vertical++;
+ 
+   label = gtk_label_new (_("Layout name:"));
+-  gtk_label_set_xalign (GTK_LABEL (label), 0.f);
+-  gtk_widget_set_hexpand (label, TRUE);
+-  gtk_grid_attach (GTK_GRID (grid), label, 0, grid_vertical, 1, 1);
++  gtk_misc_set_alignment (GTK_MISC (label), 0.f, 0.f);
++  gtk_table_attach_magic0 (label);
+ 
+   display_name_combo = gtk_combo_box_text_new ();
+   gtk_combo_box_text_append_text (GTK_COMBO_BOX_TEXT (display_name_combo), _("country"));
+   gtk_combo_box_text_append_text (GTK_COMBO_BOX_TEXT (display_name_combo), _("language"));
+   gtk_widget_set_size_request (display_name_combo, 230, -1);
+-  gtk_grid_attach (GTK_GRID (grid), display_name_combo, 1, grid_vertical, 1, 1);
++  gtk_table_attach_magic1 (display_name_combo);
+ 
+-  grid_vertical++;
++  table_vertical++;
+ 
+   label = gtk_label_new (_("Widget size:"));
+-  gtk_label_set_xalign (GTK_LABEL (label), 0.f);
+-  gtk_widget_set_hexpand (label, TRUE);
+-  gtk_grid_attach (GTK_GRID (grid), label, 0, grid_vertical, 1, 1);
++  gtk_misc_set_alignment (GTK_MISC (label), 0.f, 0.f);
++  gtk_table_attach_magic0 (label);
+ 
+-  display_scale_range = gtk_scale_new_with_range (GTK_ORIENTATION_HORIZONTAL,
+-                                                  DISPLAY_SCALE_MIN, DISPLAY_SCALE_MAX, 1);
++  display_scale_range = gtk_hscale_new_with_range (DISPLAY_SCALE_MIN, DISPLAY_SCALE_MAX, 1);
+   gtk_scale_set_value_pos (GTK_SCALE (display_scale_range), GTK_POS_RIGHT);
+   gtk_widget_set_size_request (display_scale_range, 230, -1);
+-  gtk_grid_attach (GTK_GRID (grid), display_scale_range, 1, grid_vertical, 1, 1);
++  gtk_table_attach_magic1 (display_scale_range);
+ 
+-  grid_vertical++;
++  table_vertical++;
+ 
+   label = gtk_label_new (_("Caps Lock indicator:"));
+-  gtk_label_set_xalign (GTK_LABEL (label), 0.f);
+-  gtk_widget_set_hexpand (label, TRUE);
+-  gtk_grid_attach (GTK_GRID (grid), label, 0, grid_vertical, 1, 1);
++  gtk_misc_set_alignment (GTK_MISC (label), 0.f, 0.f);
++  gtk_table_attach_magic0 (label);
+ 
+-  caps_lock_indicator_switch = gtk_switch_new ();
+-  gtk_widget_set_halign (caps_lock_indicator_switch, GTK_ALIGN_END);
+-  gtk_widget_set_valign (caps_lock_indicator_switch, GTK_ALIGN_CENTER);
+-  gtk_grid_attach (GTK_GRID (grid), caps_lock_indicator_switch, 1, grid_vertical, 1, 1);
++  caps_lock_indicator_switch = gtk_check_button_new ();
++  alignment = gtk_alignment_new (1.f, 0.f, 0.f, 0.f);
++  gtk_container_add (GTK_CONTAINER (alignment), caps_lock_indicator_switch);
++  gtk_table_attach_magic1 (alignment);
+ 
+-  grid_vertical++;
++  table_vertical++;
+ 
+   label = gtk_label_new (_("Tooltip icon:"));
+-  gtk_label_set_xalign (GTK_LABEL (label), 0.f);
+-  gtk_widget_set_hexpand (label, TRUE);
+-  gtk_grid_attach (GTK_GRID (grid), label, 0, grid_vertical, 1, 1);
++  gtk_misc_set_alignment (GTK_MISC (label), 0.f, 0.f);
++  gtk_table_attach_magic0 (label);
+ 
+-  display_tooltip_icon_switch = gtk_switch_new ();
+-  gtk_widget_set_halign (display_tooltip_icon_switch, GTK_ALIGN_END);
+-  gtk_widget_set_valign (display_tooltip_icon_switch, GTK_ALIGN_CENTER);
+-  gtk_grid_attach (GTK_GRID (grid), display_tooltip_icon_switch, 1, grid_vertical, 1, 1);
++  display_tooltip_icon_switch = gtk_check_button_new ();
++  alignment = gtk_alignment_new (1.f, 0.f, 0.f, 0.f);
++  gtk_container_add (GTK_CONTAINER (alignment), display_tooltip_icon_switch);
++  gtk_table_attach_magic1 (alignment);
+ 
+-  grid_vertical = 0;
++  table_vertical = 0;
+ 
+   frame = xfce_gtk_frame_box_new (_("Behavior"), &bin);
+   G_GNUC_BEGIN_IGNORE_DEPRECATIONS
+@@ -198,24 +197,21 @@ xkb_dialog_configure_plugin (XfcePanelPlugin *plugin,
+   G_GNUC_END_IGNORE_DEPRECATIONS
+   gtk_box_pack_start (GTK_BOX (vbox), frame, TRUE, TRUE, 0);
+ 
+-  grid = gtk_grid_new ();
+-  gtk_grid_set_row_spacing (GTK_GRID (grid), 6);
+-  gtk_grid_set_column_spacing (GTK_GRID (grid), 12);
+-  gtk_grid_set_row_homogeneous (GTK_GRID (grid), TRUE);
+-  gtk_widget_set_size_request (grid, -1, -1);
+-  gtk_container_add (GTK_CONTAINER (bin), grid);
++  table = gtk_table_new (0, 3, TRUE);
++  gtk_table_set_row_spacings (GTK_TABLE (table), 6);
++  gtk_table_set_col_spacings (GTK_TABLE (table), 12);
++  gtk_container_add (GTK_CONTAINER (bin), table);
+ 
+   label = gtk_label_new (_("Manage layout:"));
+-  gtk_label_set_xalign (GTK_LABEL (label), 0.f);
+-  gtk_widget_set_hexpand (label, TRUE);
+-  gtk_grid_attach (GTK_GRID (grid), label, 0, grid_vertical, 1, 1);
++  gtk_misc_set_alignment (GTK_MISC (label), 0.f, 0.f);
++  gtk_table_attach_magic0 (label);
+ 
+   group_policy_combo = gtk_combo_box_text_new ();
+   gtk_combo_box_text_append_text (GTK_COMBO_BOX_TEXT (group_policy_combo), _("globally"));
+   gtk_combo_box_text_append_text (GTK_COMBO_BOX_TEXT (group_policy_combo), _("per window"));
+   gtk_combo_box_text_append_text (GTK_COMBO_BOX_TEXT (group_policy_combo), _("per application"));
+   gtk_widget_set_size_request (group_policy_combo, 230, -1);
+-  gtk_grid_attach (GTK_GRID (grid), group_policy_combo, 1, grid_vertical, 1, 1);
++  gtk_table_attach_magic1 (group_policy_combo);
+ 
+   gtk_widget_show_all (vbox);
+ 
+diff --git a/panel-plugin/xkb-plugin.c b/panel-plugin/xkb-plugin.c
+index 4d137d4..ad0be51 100644
+--- a/panel-plugin/xkb-plugin.c
++++ b/panel-plugin/xkb-plugin.c
+@@ -61,6 +61,7 @@ struct _XkbPlugin
+   GtkWidget           *layout_image;
+   GtkWidget           *popup;
+   MenuItemData        *popup_user_data;
++  gboolean             popup_active;
+ };
+ 
+ /* ------------------------------------------------------------------ *
+@@ -104,6 +105,8 @@ static void         xkb_plugin_configure_layout         (GtkWidget        *widge
+ static gboolean     xkb_plugin_button_clicked           (GtkWidget        *widget,
+                                                          GdkEventButton   *event,
+                                                          XkbPlugin        *plugin);
++static void         xkb_plugin_button_after_clicked     (GtkWidget        *widget,
++                                                         XkbPlugin        *plugin);
+ static gboolean     xkb_plugin_button_scrolled          (GtkWidget        *widget,
+                                                          GdkEventScroll   *event,
+                                                          XkbPlugin        *plugin);
+@@ -115,8 +118,8 @@ static gboolean     xkb_plugin_set_tooltip              (GtkWidget        *widge
+                                                          GtkTooltip       *tooltip,
+                                                          XkbPlugin        *plugin);
+ 
+-static gboolean     xkb_plugin_layout_image_draw        (GtkWidget        *widget,
+-                                                         cairo_t          *cr,
++static gboolean     xkb_plugin_layout_image_expose      (GtkWidget        *widget,
++                                                         GdkEventExpose   *event,
+                                                          XkbPlugin        *plugin);
+ 
+ static void         xkb_plugin_update_size_allocation   (XkbPlugin        *plugin);
+@@ -156,6 +159,7 @@ xkb_plugin_init (XkbPlugin *plugin)
+   plugin->layout_image = NULL;
+   plugin->popup = NULL;
+   plugin->popup_user_data = NULL;
++  plugin->popup_active = FALSE;
+ }
+ 
+ 
+@@ -165,7 +169,6 @@ xkb_plugin_construct (XfcePanelPlugin *plugin)
+ {
+   XkbPlugin      *xkb_plugin;
+   GtkWidget      *configure_layouts;
+-  GtkCssProvider *css_provider;
+ 
+   xkb_plugin = XKB_PLUGIN (plugin);
+ 
+@@ -180,25 +183,19 @@ xkb_plugin_construct (XfcePanelPlugin *plugin)
+   g_signal_connect_swapped (G_OBJECT (xkb_plugin->config), "notify::" CAPS_LOCK_INDICATOR,
+                             G_CALLBACK (xkb_plugin_refresh_gui), xkb_plugin);
+ 
+-  xkb_plugin->button = gtk_button_new ();
++  xkb_plugin->button = xfce_panel_create_toggle_button ();
+   gtk_button_set_relief (GTK_BUTTON (xkb_plugin->button), GTK_RELIEF_NONE);
+   gtk_container_add (GTK_CONTAINER (plugin), xkb_plugin->button);
+   xfce_panel_plugin_add_action_widget (plugin, xkb_plugin->button);
+   gtk_widget_add_events (xkb_plugin->button, GDK_SCROLL_MASK);
+ 
+-  /* remove padding inside button */
+-  css_provider = gtk_css_provider_new ();
+-  gtk_css_provider_load_from_data (css_provider, ".xfce4-panel button {padding: 0;}", -1, NULL);
+-  gtk_style_context_add_provider (gtk_widget_get_style_context (xkb_plugin->button),
+-                                  GTK_STYLE_PROVIDER (css_provider),
+-                                  GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+-  g_object_unref (css_provider);
+-
+   gtk_widget_show (xkb_plugin->button);
+   g_signal_connect (xkb_plugin->button, "button-press-event",
+                     G_CALLBACK (xkb_plugin_button_clicked), xkb_plugin);
+   g_signal_connect (xkb_plugin->button, "button-release-event",
+                     G_CALLBACK (xkb_plugin_button_clicked), xkb_plugin);
++  g_signal_connect (xkb_plugin->button, "clicked",
++                    G_CALLBACK (xkb_plugin_button_after_clicked), xkb_plugin);
+   g_signal_connect (xkb_plugin->button, "scroll-event",
+                     G_CALLBACK (xkb_plugin_button_scrolled), xkb_plugin);
+ 
+@@ -208,8 +205,8 @@ xkb_plugin_construct (XfcePanelPlugin *plugin)
+ 
+   xkb_plugin->layout_image = gtk_image_new ();
+   gtk_container_add (GTK_CONTAINER (xkb_plugin->button), xkb_plugin->layout_image);
+-  g_signal_connect (G_OBJECT (xkb_plugin->layout_image), "draw",
+-                    G_CALLBACK (xkb_plugin_layout_image_draw), xkb_plugin);
++  g_signal_connect (G_OBJECT (xkb_plugin->layout_image), "expose-event",
++                    G_CALLBACK (xkb_plugin_layout_image_expose), xkb_plugin);
+   gtk_widget_show (xkb_plugin->layout_image);
+ 
+   xkb_plugin->keyboard = xkb_keyboard_new (xkb_plugin->config);
+@@ -449,15 +446,11 @@ xkb_plugin_popup_menu_show (GtkWidget      *widget,
+                             GdkEventButton *event,
+                             XkbPlugin      *plugin)
+ {
+-  gtk_widget_set_state_flags (widget, GTK_STATE_FLAG_CHECKED, FALSE);
+-#if GTK_CHECK_VERSION(3, 22, 0)
+-  gtk_menu_popup_at_widget (GTK_MENU (plugin->popup), widget,
+-                            GDK_GRAVITY_NORTH_WEST, GDK_GRAVITY_NORTH_WEST, (GdkEvent *) event);
+-#else
++  plugin->popup_active = TRUE;
++  gtk_toggle_button_set_active (GTK_TOGGLE_BUTTON (plugin->button), TRUE);
+   gtk_menu_popup (GTK_MENU (plugin->popup), NULL, NULL,
+-                  xfce_panel_plugin_position_menu, xkb_plugin_get_plugin (plugin),
++                  xfce_panel_plugin_position_menu, plugin,
+                   0, event->time);
+-#endif
+ }
+ 
+ 
+@@ -468,7 +461,8 @@ xkb_plugin_popup_menu_deactivate (XkbPlugin    *plugin,
+ {
+   g_return_if_fail (GTK_IS_MENU_SHELL (menu_shell));
+ 
+-  gtk_widget_unset_state_flags (plugin->button, GTK_STATE_FLAG_CHECKED);
++  plugin->popup_active = FALSE;
++  gtk_toggle_button_set_active (GTK_TOGGLE_BUTTON (plugin->button), FALSE);
+ }
+ 
+ 
+@@ -555,6 +549,16 @@ xkb_plugin_button_clicked (GtkWidget      *widget,
+ 
+ 
+ 
++static void
++xkb_plugin_button_after_clicked (GtkWidget *widget,
++                                 XkbPlugin *plugin)
++{
++  if (!plugin->popup_active)
++    gtk_toggle_button_set_active (GTK_TOGGLE_BUTTON (plugin->button), FALSE);
++}
++
++
++
+ static gboolean
+ xkb_plugin_button_scrolled (GtkWidget      *button,
+                             GdkEventScroll *event,
+@@ -608,18 +612,20 @@ xkb_plugin_set_tooltip (GtkWidget  *widget,
+ 
+ 
+ static gboolean
+-xkb_plugin_layout_image_draw (GtkWidget *widget,
+-                              cairo_t   *cr,
+-                              XkbPlugin *plugin)
++xkb_plugin_layout_image_expose (GtkWidget *widget,
++                                GdkEventExpose *expose,
++                                XkbPlugin *plugin)
+ {
++  cairo_t              *cr;
+   const gchar          *group_name;
+   gint                  variant_index;
+   GdkPixbuf            *pixbuf;
+   GtkAllocation         allocation;
+-  GtkStyleContext      *style_ctx;
+-  GtkStateFlags         state;
++  GtkStyle             *style;
++  GtkStateType          state;
++  PangoContext         *context;
+   PangoFontDescription *desc;
+-  GdkRGBA               rgba;
++  GdkColor             *color;
+   gint                  actual_hsize, actual_vsize;
+   XkbDisplayType        display_type;
+   XkbDisplayName        display_name;
+@@ -636,9 +642,9 @@ xkb_plugin_layout_image_draw (GtkWidget *widget,
+   actual_hsize = allocation.width;
+   actual_vsize = allocation.height;
+ 
+-  state = gtk_widget_get_state_flags (plugin->button);
+-  style_ctx = gtk_widget_get_style_context (plugin->button);
+-  gtk_style_context_get_color (style_ctx, state, &rgba);
++  state = gtk_widget_get_state (plugin->button);
++  style = gtk_widget_get_style (plugin->button);
++  color = &style->fg[state];
+ 
+   group_name = xkb_keyboard_get_group_name (plugin->keyboard, display_name, -1);
+   pixbuf = xkb_keyboard_get_pixbuf (plugin->keyboard, FALSE, -1);
+@@ -650,6 +656,9 @@ xkb_plugin_layout_image_draw (GtkWidget *widget,
+ 
+   DBG ("img_exposed: actual h/v (%d/%d)", actual_hsize, actual_vsize);
+ 
++  cr = gdk_cairo_create (widget->window);
++  cairo_translate (cr, allocation.x, allocation.y);
++
+   switch (display_type)
+     {
+     case DISPLAY_TYPE_IMAGE:
+@@ -665,20 +674,23 @@ xkb_plugin_layout_image_draw (GtkWidget *widget,
+                             actual_hsize, actual_vsize,
+                             variant_index,
+                             display_scale,
+-                            rgba);
++                            color);
+       break;
+ 
+     case DISPLAY_TYPE_SYSTEM:
+-      gtk_style_context_get (style_ctx, state, "font", &desc, NULL);
++      context = gtk_widget_get_pango_context (plugin->button);
++      desc = pango_context_get_font_description (context);
+ 
+       xkb_cairo_draw_label_system (cr, group_name,
+                                    actual_hsize, actual_vsize,
+                                    variant_index,
+                                    caps_lock_indicator && caps_lock_enabled,
+-                                   desc, rgba);
++                                   desc, color);
+       break;
+     }
+ 
++  cairo_destroy (cr);
++
+   return FALSE;
+ }
+ 
+diff --git a/panel-plugin/xkb.desktop.in b/panel-plugin/xkb.desktop.in
+index e517648..69dab3f 100644
+--- a/panel-plugin/xkb.desktop.in
++++ b/panel-plugin/xkb.desktop.in
+@@ -6,4 +6,4 @@ Icon=preferences-desktop-keyboard
+ X-XFCE-Module=xkb
+ X-XFCE-Unique=TRUE
+ X-XFCE-Internal=FALSE
+-X-XFCE-API=2.0
++X-XFCE-API=1.0

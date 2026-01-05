@@ -1,0 +1,113 @@
+From 0510067c46512e9b0ac32308a695af4307250f42 Mon Sep 17 00:00:00 2001
+From: rbuj <robert.buj@gmail.com>
+Date: Sun, 15 Sep 2019 23:30:48 +0200
+Subject: [PATCH 2/2] Zstandard: read .tar.zst files
+
+  $ tar cafv ~/test.tar.zst ~/test
+  $ xdg-mime query filetype ~/test.tar.zst
+  application/x-zstd-compressed-tar
+
+Test:
+
+  $ CFLAGS="-g -O0" ./autogen.sh --enable-magic --enable-packagekit --prefix=/usr && make && sudo make install
+  $ engrampa ~/test.tar.zst
+---
+ caja/caja-engrampa.c |  1 +
+ src/fr-command-tar.c | 20 ++++++++++++++++++++
+ src/fr-init.c        |  2 ++
+ 3 files changed, 23 insertions(+)
+
+diff --git a/caja/caja-engrampa.c b/caja/caja-engrampa.c
+index 589aae1..ad349dd 100644
+--- a/caja/caja-engrampa.c
++++ b/caja/caja-engrampa.c
+@@ -199,6 +199,7 @@ static struct {
+ 		{ "application/x-zip", TRUE },
+ 		{ "application/x-zip-compressed", TRUE },
+ 		{ "application/x-zoo", TRUE },
++		{ "application/x-zstd-compressed-tar", TRUE },
+ 		{ "application/zip", TRUE },
+ 		{ "application/zstd", TRUE },
+ 		{ "multipart/x-zip", TRUE },
+diff --git a/src/fr-command-tar.c b/src/fr-command-tar.c
+index d52964c..19f31f9 100644
+--- a/src/fr-command-tar.c
++++ b/src/fr-command-tar.c
+@@ -822,6 +822,11 @@ get_uncompressed_name (FrCommandTar *c_tar,
+ 		if (file_extension_is (e_filename, ".tar.7z"))
+ 			new_name[l - 3] = 0;
+ 	}
++	else if (is_mime_type (comm->mime_type, "application/x-zstd-compressed-tar")) {
++		/* X.tar.zst -->  X.tar */
++		if (file_extension_is (e_filename, ".tar.zst"))
++			new_name[l - 4] = 0;
++	}
+ 
+ 	return new_name;
+ }
+@@ -967,6 +972,14 @@ fr_command_tar_uncompress (FrCommand *comm)
+ 			fr_process_add_arg (comm->process, tmp_name);
+ 			fr_process_end_command (comm->process);
+ 		}
++		else if (is_mime_type (comm->mime_type, "application/x-zstd-compressed-tar")) {
++			fr_process_begin_command (comm->process, "zstd");
++			fr_process_set_begin_func (comm->process, begin_func__uncompress, comm);
++			fr_process_add_arg (comm->process, "-f");
++			fr_process_add_arg (comm->process, "-d");
++			fr_process_add_arg (comm->process, tmp_name);
++			fr_process_end_command (comm->process);
++		}
+ 	}
+ 
+ 	c_tar->uncomp_filename = get_uncompressed_name (c_tar, tmp_name);
+@@ -995,6 +1008,7 @@ const char *tar_mime_types[] = { "application/x-compressed-tar",
+ 			         "application/x-lzop-compressed-tar",
+ 			         "application/x-tarz",
+ 				 "application/x-xz-compressed-tar",
++				 "application/x-zstd-compressed-tar",
+ 			         NULL };
+ 
+ 
+@@ -1066,6 +1080,10 @@ fr_command_tar_get_capabilities (FrCommand  *comm,
+ 			}
+ 		}
+ 	}
++	else if (is_mime_type (mime_type, "application/x-zstd-compressed-tar")) {
++		if (is_program_available ("zstd", check_command))
++			capabilities |= FR_COMMAND_CAN_READ;
++	}
+ 
+ 	return capabilities;
+ }
+@@ -1117,6 +1135,8 @@ fr_command_tar_get_packages (FrCommand  *comm,
+ 		return PACKAGES ("tar,lzop");
+ 	else if (is_mime_type (mime_type, "application/x-7z-compressed-tar"))
+ 		return PACKAGES ("tar,p7zip");
++	else if (is_mime_type (mime_type, "application/x-zstd-compressed-tar"))
++		return PACKAGES ("tar,zstd");
+ 
+ 	return NULL;
+ }
+diff --git a/src/fr-init.c b/src/fr-init.c
+index 8e28404..7983b63 100644
+--- a/src/fr-init.c
++++ b/src/fr-init.c
+@@ -100,6 +100,7 @@ FrMimeTypeDescription mime_type_desc[] = {
+ 	{ "application/x-xz",                   ".xz",       N_("Xz (.xz)"), 0 },
+ 	{ "application/x-xz-compressed-tar",    ".tar.xz",   N_("Tar compressed with xz (.tar.xz)"), 0 },
+ 	{ "application/x-zoo",                  ".zoo",      N_("Zoo (.zoo)"), 0 },
++	{ "application/x-zstd-compressed-tar",  ".tar.zst",  N_("Tar compressed with zstd (.tar.ztd)"), 0 },
+ 	{ "application/zip",                    ".zip",      N_("Zip (.zip)"), 0 },
+ 	{ "application/zstd",                   ".zst",      N_("Zstandard (.ztd)"), 0 },
+ 	{ NULL, NULL, NULL, 0 }
+@@ -146,6 +147,7 @@ FrExtensionType file_ext_type[] = {
+ 	{ ".tar.7z", "application/x-7z-compressed-tar" },
+ 	{ ".tar.xz", "application/x-xz-compressed-tar" },
+ 	{ ".tar.Z", "application/x-tarz" },
++	{ ".tar.zst", "application/x-zstd-compressed-tar" },
+ 	{ ".taz", "application/x-tarz" },
+ 	{ ".tbz", "application/x-bzip-compressed-tar" },
+ 	{ ".tbz2", "application/x-bzip-compressed-tar" },
+-- 
+2.26.2
+

@@ -1,0 +1,33 @@
+From e29533c9c37b2664f8daf451426804b6d618c444 Mon Sep 17 00:00:00 2001
+From: Johannes Marbach <n0-0ne+xfce@mailbox.org>
+Date: Sat, 9 Feb 2019 23:16:15 +0100
+Subject: [PATCH] Resume playback after replacing queue
+
+This resumes playback after replacing the current queue
+if MPD was playing before.
+
+Fixes: #9100
+---
+ src/dbbrowser.vala | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/src/dbbrowser.vala b/src/dbbrowser.vala
+index cc7bcf8..6893794 100644
+--- a/src/dbbrowser.vala
++++ b/src/dbbrowser.vala
+@@ -404,8 +404,12 @@ namespace Xfmpc {
+ 		}
+ 
+ 		private void cb_replace_with_selected_rows () {
++			var playing = this.mpdclient.is_playing ();
+ 			this.mpdclient.queue_clear ();
+ 			add_selected_rows ();
++			if (playing) {
++				this.mpdclient.play ();
++			}
+ 		}
+ 
+ 		private void cb_browse () {
+-- 
+GitLab
+

@@ -1,0 +1,23 @@
+diff --git a/thunar-archive-plugin/tap-provider.c b/thunar-archive-plugin/tap-provider.c
+index 96c0f2e..97ce955 100644
+--- a/thunar-archive-plugin/tap-provider.c
++++ b/thunar-archive-plugin/tap-provider.c
+@@ -94,7 +94,7 @@ struct _TapProvider
+ 
+ 
+ 
+-static const gchar TAP_MIME_TYPES[][34] = {
++static const gchar TAP_MIME_TYPES[][36] = {
+   "application/x-7z-compressed",
+   "application/x-7z-compressed-tar",
+   "application/x-ar",
+@@ -117,7 +117,9 @@ static const gchar TAP_MIME_TYPES[][34] = {
+   "application/x-xz-compressed-tar",
+   "application/x-zip",
+   "application/x-zip-compressed",
++  "application/x-zstd-compressed-tar",
+   "application/zip",
++  "application/zstd",
+   "multipart/x-zip",
+   "application/x-rpm",
+   "application/x-jar",

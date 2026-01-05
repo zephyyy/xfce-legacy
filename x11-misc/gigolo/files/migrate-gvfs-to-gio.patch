@@ -1,0 +1,27 @@
+From fb63ddf0fa4ed93789366aefb7a2a2b44e919386 Mon Sep 17 00:00:00 2001
+From: Debian Xfce Maintainers <debian-xfce@lists.debian.org>
+Date: Sat, 15 Dec 2018 14:32:35 +0100
+Subject: [PATCH] migrate gvfs commands to gio
+
+gvfs-* commands are deprecated and replaced by gio binary so adjust the
+call
+---
+ src/settings.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/settings.c b/src/settings.c
+index e20b067..3ffe4b6 100644
+--- a/src/settings.c
++++ b/src/settings.c
+@@ -569,7 +569,7 @@ static void load_settings_read_config(GigoloSettingsPrivate *priv)
+ 		error = NULL;
+ 	}
+ 
+-	priv->file_manager = get_setting_string(k, SECTION_GENERAL, "file_manager", "gvfs-open");
++	priv->file_manager = get_setting_string(k, SECTION_GENERAL, "file_manager", "gio open");
+ 	/* is there a generic way to open a default terminal? */
+ 	priv->terminal = get_setting_string(k, SECTION_GENERAL, "terminal", "xterm");
+ 	priv->autoconnect_interval = get_setting_int(k, SECTION_GENERAL, "autoconnect_interval",
+-- 
+GitLab
+

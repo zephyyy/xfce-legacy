@@ -1,0 +1,174 @@
+From 07c54643bd284ed7f9f5e70f96fbb93dbdba50d5 Mon Sep 17 00:00:00 2001
+From: Gaël Bonithon <gael@xfce.org>
+Date: Mon, 29 Mar 2021 01:06:01 +0200
+Subject: [PATCH] Reset source id to prevent double free
+
+Fixes in particular a GLib-CRITICAL when closing the prefs dialog.
+---
+ panel-plugin/netload.c | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/panel-plugin/netload.c b/panel-plugin/netload.c
+index 1659421..3908ef7 100644
+--- a/panel-plugin/netload.c
++++ b/panel-plugin/netload.c
+@@ -336,6 +336,7 @@ static void monitor_set_mode (XfcePanelPlugin *plugin, XfcePanelPluginMode mode,
+     if (global->timeout_id)
+     {
+         g_source_remove(global->timeout_id);
++        global->timeout_id = 0;
+     }
+ 
+     if (mode == XFCE_PANEL_PLUGIN_MODE_DESKBAR)
+@@ -408,6 +409,7 @@ static void monitor_free(XfcePanelPlugin *plugin, t_global_monitor *global)
+     if (global->timeout_id)
+     {
+         g_source_remove(global->timeout_id);
++        global->timeout_id = 0;
+     }
+ 
+     if (global->monitor->options.label_text)
+@@ -554,7 +556,10 @@ static void setup_monitor(t_global_monitor *global, gboolean supress_warnings)
+     gint i;
+ 
+     if (global->timeout_id)
++    {
+         g_source_remove(global->timeout_id);
++        global->timeout_id = 0;
++    }
+ 
+     /* Show title label? */
+     if (global->monitor->options.use_label)
+---
+From 509b2c5ca5423318a57990f4d0341782454d19af Mon Sep 17 00:00:00 2001
+From: Avinash Sonawane <rootkea@gmail.com>
+Date: Tue, 23 Mar 2021 13:10:20 +0530
+Subject: [PATCH] Check if ip_address string is non-empty
+
+---
+ panel-plugin/net.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/panel-plugin/net.c b/panel-plugin/net.c
+index 5ed8694..e4b66c3 100644
+--- a/panel-plugin/net.c
++++ b/panel-plugin/net.c
+@@ -217,7 +217,7 @@ char* get_ip_address(netdata* data)
+     struct sockaddr_in *p_sa;
+         
+     /* use cached value if possible and if the update count is non-zero */ 
+-    if (data->ip_address && data->ip_update_count > 0)
++    if (data->ip_address[0] && data->ip_update_count > 0)
+     {
+         data->ip_update_count--;
+         return data->ip_address;
+---
+From c22bdad6245700a0ddd6a4f5522d945614e2181f Mon Sep 17 00:00:00 2001
+From: Avinash Sonawane <rootkea@gmail.com>
+Date: Tue, 23 Mar 2021 11:56:58 +0530
+Subject: [PATCH] Free memory only after last reference
+
+Found by: scan-build
+---
+ panel-plugin/netload.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/panel-plugin/netload.c b/panel-plugin/netload.c
+index 3908ef7..000a215 100644
+--- a/panel-plugin/netload.c
++++ b/panel-plugin/netload.c
+@@ -418,10 +418,10 @@ static void monitor_free(XfcePanelPlugin *plugin, t_global_monitor *global)
+     }
+ 
+     gtk_widget_destroy(global->tooltip_text);
+-
+-    g_free(global);
+     
+     close_netload( &(global->monitor->data) );
++
++    g_free(global);
+ }
+ 
+ 
+---
+From e8ba7d16a83f715636ea0c64091263145d95da55 Mon Sep 17 00:00:00 2001
+From: Gaël Bonithon <gael@xfce.org>
+Date: Fri, 21 Apr 2023 13:01:20 +0200
+Subject: [PATCH] Fix wrong units in bytes (Fixes #22)
+
+---
+ panel-plugin/utils.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/panel-plugin/utils.c b/panel-plugin/utils.c
+index 5c4cefa..54f1e27 100644
+--- a/panel-plugin/utils.c
++++ b/panel-plugin/utils.c
+@@ -78,7 +78,7 @@ char* format_byte_humanreadable(char* string, int stringsize, double number, int
+     char* str = string;
+     char buffer[BUFSIZ], formatstring[BUFSIZ];
+     char* bufptr = buffer;
+-    char* unit_names[] = { N_("B"), N_("KiB"), N_("MiB"), N_("GiB") };
++    char* unit_names[] = { N_("Bps"), N_("KiBps"), N_("MiBps"), N_("GiBps") };
+     char* unit_names_bits[] = { N_("bps"), N_("Kbps"), N_("Mbps"), N_("Gbps") };
+     unsigned int uidx = 0;
+     double number_displayed = 0;
+---
+From 17ba2f635b9bcc02415e12ab0f4cfbeb920e1377 Mon Sep 17 00:00:00 2001
+From: Guido Berhoerster <guido+xfce@berhoerster.name>
+Date: Thu, 8 Jun 2017 11:01:34 +0200
+Subject: [PATCH] Fix array out of bounds write
+
+- Fix bug #11328
+---
+ panel-plugin/net.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/panel-plugin/net.c b/panel-plugin/net.c
+index c66d144..6e8276c 100644
+--- a/panel-plugin/net.c
++++ b/panel-plugin/net.c
+@@ -33,6 +33,8 @@
+ #include <config.h>
+ #endif
+ 
++#include <glib.h>
++
+ /* From Wormulon */
+ #include "net.h"
+ #include "os.h"
+@@ -81,8 +82,7 @@ int init_netload(netdata* data, const char* device)
+         return TRUE;
+     }
+     
+-    strncpy( data->ifdata.if_name, device, INTERFACE_NAME_LENGTH);
+-    data->ifdata.if_name[INTERFACE_NAME_LENGTH] = '\0';
++    g_strlcpy(data->ifdata.if_name, device, sizeof(data->ifdata.if_name));
+     
+     init_osspecific( data );
+     
+---
+From cd5428b77377b0f0a579c3d8cc3978b25267f22a Mon Sep 17 00:00:00 2001
+From: Adam Borowski <kilobyte@angband.pl>
+Date: Tue, 6 Jun 2017 23:25:29 +0200
+Subject: [PATCH] Remove sys/sysctl.h on linux platform
+
+This include is useless and can be removed.
+This syscall has been strongly deprecated for ages and the plugin doesn't use it any more.  On old architectures, this include is benign as long as it's unused, on new ones (such as x32) it results in a build failure.
+Fix bug #11477
+---
+ panel-plugin/os.h | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/panel-plugin/os.h b/panel-plugin/os.h
+index 473c2a4..9a5c544 100644
+--- a/panel-plugin/os.h
++++ b/panel-plugin/os.h
+@@ -170,7 +170,6 @@
+ #elif __linux__             /* L I N U X */
+ #  include <stdio.h>
+ #  include <sys/param.h>
+-#  include <sys/sysctl.h>
+ #  include <stdlib.h>
+ #  include <stdarg.h>
+ #  include <unistd.h>

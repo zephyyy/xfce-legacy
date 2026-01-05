@@ -1,0 +1,185 @@
+--- a/src/appfinder-category-model.c
++++ b/src/appfinder-category-model.c
+@@ -533,7 +533,7 @@
+   model->categories = g_slist_prepend (model->categories, item);
+ 
+   item = g_slice_new0 (CategoryItem);
+-  item->directory = g_object_ref (G_OBJECT (model->all_applications));
++  item->directory = g_object_ref (model->all_applications);
+   model->categories = g_slist_prepend (model->categories, item);
+ 
+   path = gtk_tree_path_new_first ();
+--- a/src/appfinder-model.c
++++ b/src/appfinder-model.c
+@@ -884,7 +884,7 @@
+   appfinder_return_val_if_fail (GARCON_IS_MENU_ITEM (menu_item), NULL);
+ 
+   item = g_slice_new0 (ModelItem);
+-  item->item = g_object_ref (G_OBJECT (menu_item));
++  item->item = g_object_ref (menu_item);
+ 
+   appfinder_refcount_debug_add (G_OBJECT (menu_item),
+      garcon_menu_item_get_desktop_id (menu_item));
+@@ -927,7 +927,7 @@
+       if (item->item == menu_item)
+         {
+           categories = g_ptr_array_ref (item->categories);
+-          g_object_ref (G_OBJECT (menu_item));
++          g_object_ref (menu_item);
+ 
+           APPFINDER_DEBUG ("update item %s", garcon_menu_item_get_desktop_id (menu_item));
+ 
+@@ -1075,8 +1075,8 @@
+   /* add new command */
+   item = g_slice_new0 (ModelItem);
+   item->command = g_strdup (command);
+-  item->icon = g_object_ref (G_OBJECT (model->command_icon));
+-  item->icon_large = g_object_ref (G_OBJECT (model->command_icon_large));
++  item->icon = g_object_ref (model->command_icon);
++  item->icon_large = g_object_ref (model->command_icon_large);
+   model->items = g_slist_insert_sorted (model->items, item, xfce_appfinder_model_item_compare);
+ 
+   /* find the item and the position */
+@@ -1217,7 +1217,7 @@
+         {
+           APPFINDER_DEBUG ("monitor history file %s", path);
+ 
+-          model->history_file = g_object_ref (G_OBJECT (file));
++          model->history_file = g_object_ref (file);
+           g_signal_connect (G_OBJECT (model->history_monitor), "changed",
+               G_CALLBACK (xfce_appfinder_model_history_changed), model);
+         }
+@@ -1395,7 +1395,7 @@
+         {
+           APPFINDER_DEBUG ("monitor bookmarks file %s", path);
+ 
+-          model->bookmarks_file = g_object_ref (G_OBJECT (file));
++          model->bookmarks_file = g_object_ref (file);
+           g_signal_connect (G_OBJECT (model->bookmarks_monitor), "changed",
+               G_CALLBACK (xfce_appfinder_model_bookmarks_changed), model);
+         }
+@@ -1464,8 +1464,8 @@
+         {
+           item = g_slice_new0 (ModelItem);
+           item->command = g_strndup (contents, end - contents);
+-          item->icon = g_object_ref (G_OBJECT (model->command_icon));
+-          item->icon_large = g_object_ref (G_OBJECT (model->command_icon_large));
++          item->icon = g_object_ref (model->command_icon);
++          item->icon_large = g_object_ref (model->command_icon_large);
+           model->collect_items = g_slist_prepend (model->collect_items, item);
+         }
+ 
+@@ -1495,7 +1495,7 @@
+       if (context->category != NULL)
+         {
+           g_ptr_array_add (item->categories,
+-                           g_object_ref (G_OBJECT (context->category)));
++                           g_object_ref (context->category));
+         }
+ 
+       context->items = g_slist_prepend (context->items, item);
+@@ -1505,7 +1505,7 @@
+            && !xfce_appfinder_model_ptr_array_find (item->categories, context->category))
+     {
+       /* add category to existing item */
+-      g_ptr_array_add (item->categories, g_object_ref (G_OBJECT (context->category)));
++      g_ptr_array_add (item->categories, g_object_ref (context->category));
+       APPFINDER_DEBUG ("%s is in %d categories", desktop_id, item->categories->len);
+     }
+ }
+@@ -1616,7 +1616,7 @@
+   g_list_free (menus);
+ 
+   if (directory != NULL && has_items)
+-    *categories = g_slist_prepend (*categories, g_object_ref (G_OBJECT (directory)));
++    *categories = g_slist_prepend (*categories, g_object_ref (directory));
+ 
+   return has_items;
+ }
+@@ -1921,7 +1921,7 @@
+ 
+   if (G_LIKELY (model != NULL))
+     {
+-      g_object_ref (G_OBJECT (model));
++      g_object_ref (model);
+     }
+   else
+     {
+@@ -2315,7 +2315,7 @@
+               item->icon_large = xfce_appfinder_model_load_pixbuf (icon_name, XFCE_APPFINDER_ICON_SIZE_48);
+             }
+ 
+-          return g_object_ref (G_OBJECT (item->icon_large));
++          return g_object_ref (item->icon_large);
+         }
+     }
+ 
+@@ -2375,8 +2375,8 @@
+ 
+       if (item->item == NULL)
+         {
+-          item->icon = g_object_ref (G_OBJECT (model->command_icon));
+-          item->icon_large = g_object_ref (G_OBJECT (model->command_icon_large));
++          item->icon = g_object_ref (model->command_icon);
++          item->icon_large = g_object_ref (model->command_icon_large);
+         }
+ 
+       if (item_changed)
+@@ -2511,7 +2511,7 @@
+ 
+   if (G_LIKELY (category != NULL))
+     {
+-      g_object_ref (G_OBJECT (category));
++      g_object_ref (category);
+     }
+   else
+     {
+@@ -2535,7 +2535,7 @@
+ 
+   if (G_LIKELY (category != NULL))
+     {
+-      g_object_ref (G_OBJECT (category));
++      g_object_ref (category);
+     }
+   else
+     {
+--- a/src/appfinder-actions.c
++++ b/src/appfinder-actions.c
+@@ -504,7 +504,7 @@
+ 
+   if (G_LIKELY (actions != NULL))
+     {
+-      g_object_ref (G_OBJECT (actions));
++      g_object_ref (actions);
+     }
+   else
+     {
+--- a/src/appfinder-window.c
++++ b/src/appfinder-window.c
+@@ -404,7 +404,7 @@
+   window->icon_theme = gtk_icon_theme_get_for_screen (gtk_window_get_screen (GTK_WINDOW (window)));
+   g_signal_connect_swapped (G_OBJECT (window->icon_theme), "changed",
+       G_CALLBACK (xfce_appfinder_window_icon_theme_changed), window);
+-  g_object_ref (G_OBJECT (window->icon_theme));
++  g_object_ref (window->icon_theme);
+ 
+   /* load categories in the model */
+   xfce_appfinder_window_category_set_categories (NULL, window);
+@@ -1441,7 +1441,7 @@
+           if (category == NULL)
+             window->filter_category = NULL;
+           else
+-            window->filter_category = g_object_ref (G_OBJECT (category));
++            window->filter_category = g_object_ref (category);
+ 
+           APPFINDER_DEBUG ("refilter category");
+ 
+@@ -1787,7 +1787,7 @@
+     }
+ 
+   /* repack the button box */
+-  g_object_ref (G_OBJECT (window->bbox));
++  g_object_ref (window->bbox);
+   parent = gtk_widget_get_parent (window->bbox);
+   if (parent != NULL)
+     gtk_container_remove (GTK_CONTAINER (parent), window->bbox);

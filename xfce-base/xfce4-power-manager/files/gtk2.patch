@@ -1,0 +1,1999 @@
+diff --git a/common/xfpm-brightness.c b/common/xfpm-brightness.c
+index 1c263c25..196b0c88 100644
+--- a/common/xfpm-brightness.c
++++ b/common/xfpm-brightness.c
+@@ -62,14 +62,11 @@ xfpm_brightness_xrand_get_limit (XfpmBrightness *brightness, RROutput output, gi
+ {
+     XRRPropertyInfo *info;
+     gboolean ret = TRUE;
+-    GdkDisplay *gdisplay;
+ 
+-    gdisplay = gdk_display_get_default ();
+-
+-    gdk_x11_display_error_trap_push (gdisplay);
++    gdk_error_trap_push ();
+     info = XRRQueryOutputProperty (gdk_x11_get_default_xdisplay (), output, brightness->priv->backlight);
+ 
+-    if (gdk_x11_display_error_trap_pop (gdisplay) != 0
++    if (gdk_error_trap_pop () != 0
+         || info == NULL)
+     {
+ 	g_warning ("could not get output property");
+@@ -100,16 +97,13 @@ xfpm_brightness_xrandr_get_level (XfpmBrightness *brightness, RROutput output, g
+     Atom actual_type;
+     int actual_format;
+     gboolean ret = FALSE;
+-    GdkDisplay *gdisplay;
+-
+-    gdisplay = gdk_display_get_default ();
+ 
+-    gdk_x11_display_error_trap_push (gdisplay);
++    gdk_error_trap_push ();
+     if (XRRGetOutputProperty (gdk_x11_get_default_xdisplay (), output, brightness->priv->backlight,
+ 			      0, 4, False, False, None,
+ 			      &actual_type, &actual_format,
+ 			      &nitems, &bytes_after, ((unsigned char **)&prop)) != Success
+-	|| gdk_x11_display_error_trap_pop (gdisplay) != 0)
++	|| gdk_error_trap_pop () != 0)
+     {
+ 	g_warning ("failed to get property");
+ 	return FALSE;
+@@ -130,20 +124,15 @@ static gboolean
+ xfpm_brightness_xrandr_set_level (XfpmBrightness *brightness, RROutput output, gint32 level)
+ {
+     gboolean ret = TRUE;
+-    Display *display;
+-    GdkDisplay *gdisplay;
+ 
+-    display = gdk_x11_get_default_xdisplay ();
+-    gdisplay = gdk_display_get_default ();
+-
+-    gdk_x11_display_error_trap_push (gdisplay);
+-    XRRChangeOutputProperty (display, output, brightness->priv->backlight, XA_INTEGER, 32,
++    gdk_error_trap_push ();
++    XRRChangeOutputProperty (gdk_x11_get_default_xdisplay (), output, brightness->priv->backlight, XA_INTEGER, 32,
+ 			     PropModeReplace, (unsigned char *) &level, 1);
+ 
+-    XFlush (display);
+-    gdk_display_flush (gdisplay);
++    XFlush (gdk_x11_get_default_xdisplay ());
++    gdk_flush ();
+ 
+-    if ( gdk_x11_display_error_trap_pop (gdisplay) )
++    if ( gdk_error_trap_pop () )
+     {
+ 	    g_warning ("failed to XRRChangeOutputProperty for brightness %d", level);
+ 	    ret = FALSE;
+@@ -156,7 +145,6 @@ static gboolean
+ xfpm_brightness_setup_xrandr (XfpmBrightness *brightness)
+ {
+     GdkScreen *screen;
+-    GdkDisplay *gdisplay;
+     XRROutputInfo *info;
+     Window window;
+     gint major, minor, screen_num;
+@@ -165,17 +153,15 @@ xfpm_brightness_setup_xrandr (XfpmBrightness *brightness)
+     gboolean ret = FALSE;
+     gint i;
+ 
+-    gdisplay = gdk_display_get_default ();
+-
+-    gdk_x11_display_error_trap_push (gdisplay);
++    gdk_error_trap_push ();
+     if (!XRRQueryExtension (gdk_x11_get_default_xdisplay (), &event_base, &error_base) ||
+ 	!XRRQueryVersion (gdk_x11_get_default_xdisplay (), &major, &minor) )
+     {
+-	gdk_x11_display_error_trap_pop_ignored (gdisplay);
++	gdk_error_trap_pop ();
+ 	g_warning ("No XRANDR extension found");
+ 	return FALSE;
+     }
+-    gdk_x11_display_error_trap_pop_ignored (gdisplay);
++    gdk_error_trap_pop ();
+ 
+     if (major == 1 && minor < 2)
+     {
+@@ -195,11 +181,11 @@ xfpm_brightness_setup_xrandr (XfpmBrightness *brightness)
+ 	return FALSE;
+     }
+ 
+-    screen = gdk_display_get_default_screen (gdisplay);
++    screen = gdk_display_get_default_screen (gdk_display_get_default ());
+ 
+-    screen_num = gdk_x11_screen_get_screen_number (screen);
++    screen_num = gdk_screen_get_number (screen);
+ 
+-    gdk_x11_display_error_trap_push (gdisplay);
++    gdk_error_trap_push ();
+ 
+     window = RootWindow (gdk_x11_get_default_xdisplay (), screen_num);
+ 
+@@ -229,7 +215,7 @@ xfpm_brightness_setup_xrandr (XfpmBrightness *brightness)
+ 	XRRFreeOutputInfo (info);
+     }
+ 
+-    if (gdk_x11_display_error_trap_pop (gdisplay) != 0)
++    if (gdk_error_trap_pop () != 0)
+         g_critical ("Failed to get output/resource info");
+ 
+     return ret;
+diff --git a/configure.ac b/configure.ac
+index 78027f3c..9fd628d6 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -70,7 +70,7 @@ XDT_CHECK_LIBX11_REQUIRE()
+ #==================================================== #
+ #          Check for required packages 		      #
+ #=====================================================#
+-m4_define([gtk_minimum_version], [3.14.0])
++m4_define([gtk_minimum_version], [2.24.0])
+ m4_define([glib_minimum_version], [2.42.0])
+ 
+ m4_define([xfconf_minimum_version], [4.12.0])
+@@ -82,14 +82,15 @@ m4_define([libnotify_minimum_version], [0.4.1])
+ m4_define([upower_minimum_version], [0.99.0])
+ m4_define([xrandr_minimum_version], [1.2.0])
+ 
+-XDT_CHECK_PACKAGE([GTK], [gtk+-3.0], [gtk_minimum_version])
++XDT_CHECK_PACKAGE([GTK], [gtk+-2.0], [gtk_minimum_version])
+ XDT_CHECK_PACKAGE([GLIB], [glib-2.0], [glib_minimum_version])
+ XDT_CHECK_PACKAGE([GOBJECT], [gobject-2.0], [glib_minimum_version])
+ XDT_CHECK_PACKAGE([GTHREAD], [gthread-2.0], [glib_minimum_version])
+ XDT_CHECK_PACKAGE([GMODULE], [gmodule-2.0], [glib_minimum_version])
+ XDT_CHECK_PACKAGE([GIO], [gio-2.0], [glib_minimum_version])
++XDT_CHECK_PACKAGE([GIO_UNIX], [gio-unix-2.0], [glib_minimum_version])
+ XDT_CHECK_PACKAGE([XFCONF], [libxfconf-0],[xfconf_minimum_version])
+-XDT_CHECK_PACKAGE([LIBXFCE4UI], [libxfce4ui-2],[libxfce4ui_minimum_version])
++XDT_CHECK_PACKAGE([LIBXFCE4UI], [libxfce4ui-1],[libxfce4ui_minimum_version])
+ XDT_CHECK_PACKAGE([LIBXFCE4UTIL], [libxfce4util-1.0],[libxfce4util_minimum_version])
+ XDT_CHECK_PACKAGE([LIBNOTIFY],[libnotify], [libnotify_minimum_version])
+ XDT_CHECK_PACKAGE([UPOWER],[upower-glib], [upower_minimum_version])
+@@ -156,7 +157,7 @@ else
+ 	build_panel_plugins="yes"
+ fi
+ 
+-XDT_CHECK_OPTIONAL_PACKAGE([LIBXFCE4PANEL], [libxfce4panel-2.0], [libxfce4panel_minimum_version],
++XDT_CHECK_OPTIONAL_PACKAGE([LIBXFCE4PANEL], [libxfce4panel-1.0], [libxfce4panel_minimum_version],
+ [xfce4panel], [To build plugin support for Xfce's panel])
+ 
+ 
+diff --git a/data/interfaces/xfpm-settings.ui b/data/interfaces/xfpm-settings.ui
+index c0d1da90..1a01a62d 100644
+--- a/data/interfaces/xfpm-settings.ui
++++ b/data/interfaces/xfpm-settings.ui
+@@ -1,8 +1,8 @@
+ <?xml version="1.0" encoding="UTF-8"?>
+ <!-- Generated with glade 3.22.1 -->
+ <interface>
+-  <requires lib="gtk+" version="3.20"/>
+-  <requires lib="libxfce4ui-2" version="4.12"/>
++  <requires lib="gtk+" version="2.24"/>
++  <requires lib="libxfce4ui-1" version="4.12"/>
+   <object class="GtkAdjustment" id="brightness-inactivity-on-ac-adjustment">
+     <property name="lower">9</property>
+     <property name="upper">120</property>
+@@ -247,10 +247,9 @@
+     <property name="type_hint">dialog</property>
+     <property name="subtitle" translatable="yes">Power manager settings</property>
+     <child internal-child="vbox">
+-      <object class="GtkBox" id="dialog-vbox">
++      <object class="GtkVBox" id="dialog-vbox">
+         <property name="visible">True</property>
+         <property name="can_focus">False</property>
+-        <property name="orientation">vertical</property>
+         <child internal-child="action_area">
+           <object class="GtkButtonBox" id="dialog-action_area">
+             <property name="visible">True</property>
+@@ -293,21 +292,19 @@
+           </packing>
+         </child>
+         <child>
+-          <object class="GtkBox" id="plug-child">
++          <object class="GtkVBox" id="plug-child">
+             <property name="visible">True</property>
+             <property name="can_focus">False</property>
+             <property name="border_width">6</property>
+-            <property name="orientation">vertical</property>
+             <child>
+               <object class="GtkNotebook" id="main-notebook">
+                 <property name="visible">True</property>
+                 <property name="can_focus">True</property>
+                 <child>
+-                  <object class="GtkBox" id="vbox1">
++                  <object class="GtkVBox" id="vbox1">
+                     <property name="visible">True</property>
+                     <property name="can_focus">False</property>
+                     <property name="border_width">12</property>
+-                    <property name="orientation">vertical</property>
+                     <property name="spacing">6</property>
+                     <child>
+                       <object class="GtkFrame" id="buttons-frame">
+@@ -316,16 +313,19 @@
+                         <property name="label_xalign">0</property>
+                         <property name="shadow_type">none</property>
+                         <child>
+-                          <object class="GtkBox" id="vbox2">
++<object class="GtkAlignment" id="alignment1">
++<property name="visible">True</property>
++<property name="can_focus">False</property>
++<property name="left_padding">18</property>
++<property name="top_padding">6</property>
++<property name="bottom_padding">18</property>
++<child>
++                          <object class="GtkVBox" id="vbox2">
+                             <property name="visible">True</property>
+                             <property name="can_focus">False</property>
+-                            <property name="margin_start">18</property>
+-                            <property name="margin_top">6</property>
+-                            <property name="margin_bottom">18</property>
+-                            <property name="orientation">vertical</property>
+                             <property name="spacing">5</property>
+                             <child>
+-                              <object class="GtkGrid" id="table1">
++                              <object class="GtkTable" id="table1">
+                                 <property name="visible">True</property>
+                                 <property name="can_focus">False</property>
+                                 <property name="row_spacing">6</property>
+@@ -382,7 +382,6 @@
+                                   <object class="GtkComboBox" id="button-power-combo">
+                                     <property name="visible">True</property>
+                                     <property name="can_focus">False</property>
+-                                    <property name="hexpand">True</property>
+                                     <signal name="changed" handler="button_power_changed_cb" swapped="no"/>
+                                     <child>
+                                       <object class="GtkCellRendererText" id="renderer1"/>
+@@ -400,7 +399,6 @@
+                                   <object class="GtkComboBox" id="button-sleep-combo">
+                                     <property name="visible">True</property>
+                                     <property name="can_focus">False</property>
+-                                    <property name="hexpand">True</property>
+                                     <signal name="changed" handler="button_sleep_changed_cb" swapped="no"/>
+                                     <child>
+                                       <object class="GtkCellRendererText" id="renderer4"/>
+@@ -418,7 +416,6 @@
+                                   <object class="GtkComboBox" id="button-hibernate-combo">
+                                     <property name="visible">True</property>
+                                     <property name="can_focus">False</property>
+-                                    <property name="hexpand">True</property>
+                                     <signal name="changed" handler="button_hibernate_changed_cb" swapped="no"/>
+                                     <child>
+                                       <object class="GtkCellRendererText" id="renderer3"/>
+@@ -436,7 +433,6 @@
+                                   <object class="GtkComboBox" id="button-battery-combo">
+                                     <property name="visible">True</property>
+                                     <property name="can_focus">False</property>
+-                                    <property name="hexpand">True</property>
+                                     <signal name="changed" handler="button_battery_changed_cb" swapped="no"/>
+                                     <child>
+                                       <object class="GtkCellRendererText" id="renderer5"/>
+@@ -451,11 +447,18 @@
+                                   </packing>
+                                 </child>
+                                 <child>
+-                                  <object class="GtkSwitch" id="handle-brightness-keys">
++<object class="GtkAlignment" id="alignment10">
++<property name="visible">True</property>
++<property name="can_focus">False</property>
++<property name="xalign">1</property>
++<property name="xscale">0</property>
++<child>
++                                  <object class="GtkCheckButton" id="handle-brightness-keys">
+                                     <property name="visible">True</property>
+                                     <property name="can_focus">True</property>
+-                                    <property name="halign">end</property>
+                                   </object>
++</child>
++</object>
+                                   <packing>
+                                     <property name="left_attach">1</property>
+                                     <property name="top_attach">4</property>
+@@ -483,6 +486,8 @@
+                               </packing>
+                             </child>
+                           </object>
++</child>
++</object>
+                         </child>
+                         <child type="label">
+                           <object class="GtkLabel" id="label1">
+@@ -506,12 +511,16 @@
+                         <property name="label_xalign">0</property>
+                         <property name="shadow_type">none</property>
+                         <child>
+-                          <object class="GtkGrid" id="table5">
++<object class="GtkAlignment" id="alignment2">
++<property name="visible">True</property>
++<property name="can_focus">False</property>
++<property name="left_padding">18</property>
++<property name="top_padding">3</property>
++<property name="bottom_padding">18</property>
++<child>
++                          <object class="GtkTable" id="table5">
+                             <property name="visible">True</property>
+                             <property name="can_focus">False</property>
+-                            <property name="margin_start">18</property>
+-                            <property name="margin_top">3</property>
+-                            <property name="margin_bottom">18</property>
+                             <property name="row_spacing">6</property>
+                             <property name="column_spacing">18</property>
+                             <child>
+@@ -554,7 +563,6 @@
+                               <object class="GtkComboBox" id="lid-on-battery-combo">
+                                 <property name="visible">True</property>
+                                 <property name="can_focus">False</property>
+-                                <property name="hexpand">True</property>
+                                 <signal name="changed" handler="on_battery_lid_changed_cb" swapped="no"/>
+                                 <child>
+                                   <object class="GtkCellRendererText" id="renderer9"/>
+@@ -572,7 +580,6 @@
+                               <object class="GtkComboBox" id="lid-on-ac-combo">
+                                 <property name="visible">True</property>
+                                 <property name="can_focus">False</property>
+-                                <property name="hexpand">True</property>
+                                 <signal name="changed" handler="on_ac_lid_changed_cb" swapped="no"/>
+                                 <child>
+                                   <object class="GtkCellRendererText" id="renderer10"/>
+@@ -590,6 +597,8 @@
+                               <placeholder/>
+                             </child>
+                           </object>
++</child>
++</object>
+                         </child>
+                         <child type="label">
+                           <object class="GtkLabel" id="label3">
+@@ -613,16 +622,19 @@
+                         <property name="label_xalign">0</property>
+                         <property name="shadow_type">none</property>
+                         <child>
+-                          <object class="GtkBox" id="vbox10">
++<object class="GtkAlignment" id="alignment3">
++<property name="visible">True</property>
++<property name="can_focus">False</property>
++<property name="left_padding">18</property>
++<property name="top_padding">6</property>
++<property name="bottom_padding">18</property>
++<child>
++                          <object class="GtkVBox" id="vbox10">
+                             <property name="visible">True</property>
+                             <property name="can_focus">False</property>
+-                            <property name="margin_start">18</property>
+-                            <property name="margin_top">6</property>
+-                            <property name="margin_bottom">18</property>
+-                            <property name="orientation">vertical</property>
+                             <property name="spacing">6</property>
+                             <child>
+-                              <object class="GtkBox" id="hbox20">
++                              <object class="GtkHBox" id="hbox20">
+                                 <property name="visible">True</property>
+                                 <property name="can_focus">False</property>
+                                 <child>
+@@ -641,11 +653,18 @@
+                                   </packing>
+                                 </child>
+                                 <child>
+-                                  <object class="GtkSwitch" id="show-notifications">
++<object class="GtkAlignment" id="alignment11">
++<property name="visible">True</property>
++<property name="can_focus">False</property>
++<property name="xalign">1</property>
++<property name="xscale">0</property>
++<child>
++                                  <object class="GtkCheckButton" id="show-notifications">
+                                     <property name="visible">True</property>
+                                     <property name="can_focus">True</property>
+-                                    <property name="halign">end</property>
+                                   </object>
++</child>
++</object>
+                                   <packing>
+                                     <property name="expand">False</property>
+                                     <property name="fill">True</property>
+@@ -660,7 +679,7 @@
+                               </packing>
+                             </child>
+                             <child>
+-                              <object class="GtkBox" id="hbox21">
++                              <object class="GtkHBox" id="hbox21">
+                                 <property name="visible">True</property>
+                                 <property name="can_focus">False</property>
+                                 <child>
+@@ -679,11 +698,18 @@
+                                   </packing>
+                                 </child>
+                                 <child>
+-                                  <object class="GtkSwitch" id="show-systray">
++<object class="GtkAlignment" id="alignment12">
++<property name="visible">True</property>
++<property name="can_focus">False</property>
++<property name="xalign">1</property>
++<property name="xscale">0</property>
++<child>
++                                  <object class="GtkCheckButton" id="show-systray">
+                                     <property name="visible">True</property>
+                                     <property name="can_focus">True</property>
+-                                    <property name="halign">end</property>
+                                   </object>
++</child>
++</object>
+                                   <packing>
+                                     <property name="expand">False</property>
+                                     <property name="fill">True</property>
+@@ -698,6 +724,8 @@
+                               </packing>
+                             </child>
+                           </object>
++</child>
++</object>
+                         </child>
+                         <child type="label">
+                           <object class="GtkLabel" id="label2">
+@@ -731,11 +759,10 @@
+                   </packing>
+                 </child>
+                 <child>
+-                  <object class="GtkBox" id="vbox3">
++                  <object class="GtkVBox" id="vbox3">
+                     <property name="visible">True</property>
+                     <property name="can_focus">False</property>
+                     <property name="border_width">12</property>
+-                    <property name="orientation">vertical</property>
+                     <property name="spacing">6</property>
+                     <child>
+                       <object class="GtkFrame" id="system-sleep-frame">
+@@ -744,15 +771,19 @@
+                         <property name="label_xalign">0</property>
+                         <property name="shadow_type">none</property>
+                         <child>
+-                          <object class="GtkGrid" id="table2">
++<object class="GtkAlignment" id="alignment4">
++<property name="visible">True</property>
++<property name="can_focus">False</property>
++<property name="left_padding">18</property>
++<property name="top_padding">6</property>
++<property name="bottom_padding">18</property>
++<child>
++                          <object class="GtkTable" id="table2">
+                             <property name="visible">True</property>
+                             <property name="can_focus">False</property>
+-                            <property name="margin_start">18</property>
+-                            <property name="margin_top">6</property>
+-                            <property name="margin_bottom">6</property>
+                             <property name="row_spacing">6</property>
+                             <property name="column_spacing">18</property>
+-                            <property name="column_homogeneous">True</property>
++                            <property name="homogeneous">True</property>
+                             <child>
+                               <object class="GtkLabel" id="system-sleep-on-battery-header">
+                                 <property name="visible">True</property>
+@@ -787,15 +818,21 @@
+                               <packing>
+                                 <property name="left_attach">0</property>
+                                 <property name="top_attach">2</property>
++                                <property name="bottom_attach">4</property>
+                               </packing>
+                             </child>
+                             <child>
+-                              <object class="GtkBox">
++<object class="GtkAlignment" id="alignment17">
++<property name="visible">True</property>
++<property name="can_focus">False</property>
++<property name="yalign">0.5</property>
++<property name="yscale">0</property>
++<child>
++                              <object class="GtkVBox" id="vbox7">
+                                 <property name="visible">True</property>
+                                 <property name="can_focus">False</property>
+-                                <property name="orientation">vertical</property>
+                                 <child>
+-                                  <object class="GtkScale" id="system-sleep-inactivity-on-battery">
++                                  <object class="GtkHScale" id="system-sleep-inactivity-on-battery">
+                                     <property name="visible">True</property>
+                                     <property name="can_focus">True</property>
+                                     <property name="adjustment">system-sleep-inactivity-on-battery-adjustment</property>
+@@ -803,9 +840,6 @@
+                                     <property name="digits">0</property>
+                                     <property name="draw_value">False</property>
+                                     <signal name="value-changed" handler="inactivity_on_battery_value_changed_cb" swapped="no"/>
+-                                    <style>
+-                                      <class name="xfce4-scale-label"/>
+-                                    </style>
+                                   </object>
+                                   <packing>
+                                     <property name="expand">False</property>
+@@ -827,18 +861,26 @@
+                                   </packing>
+                                 </child>
+                               </object>
++</child>
++</object>
+                               <packing>
+                                 <property name="left_attach">1</property>
+                                 <property name="top_attach">2</property>
++                                <property name="bottom_attach">4</property>
+                               </packing>
+                             </child>
+                             <child>
+-                              <object class="GtkBox">
++<object class="GtkAlignment" id="alignment18">
++<property name="visible">True</property>
++<property name="can_focus">False</property>
++<property name="yalign">0.5</property>
++<property name="yscale">0</property>
++<child>
++                              <object class="GtkVBox" id="vbox8">
+                                 <property name="visible">True</property>
+                                 <property name="can_focus">False</property>
+-                                <property name="orientation">vertical</property>
+                                 <child>
+-                                  <object class="GtkScale" id="system-sleep-inactivity-on-ac">
++                                  <object class="GtkHScale" id="system-sleep-inactivity-on-ac">
+                                     <property name="visible">True</property>
+                                     <property name="can_focus">True</property>
+                                     <property name="adjustment">system-sleep-inactivity-on-ac-adjustment</property>
+@@ -846,9 +888,6 @@
+                                     <property name="digits">0</property>
+                                     <property name="draw_value">False</property>
+                                     <signal name="value-changed" handler="inactivity_on_ac_value_changed_cb" swapped="no"/>
+-                                    <style>
+-                                      <class name="xfce4-scale-label"/>
+-                                    </style>
+                                   </object>
+                                   <packing>
+                                     <property name="expand">False</property>
+@@ -864,15 +903,18 @@
+                                     <property name="xalign">0.5</property>
+                                   </object>
+                                   <packing>
+-                                    <property name="expand">True</property>
++                                    <property name="expand">False</property>
+                                     <property name="fill">True</property>
+                                     <property name="position">1</property>
+                                   </packing>
+                                 </child>
+                               </object>
++</child>
++</object>
+                               <packing>
+                                 <property name="left_attach">2</property>
+                                 <property name="top_attach">2</property>
++                                <property name="bottom_attach">4</property>
+                               </packing>
+                             </child>
+                             <child>
+@@ -891,7 +933,6 @@
+                               <object class="GtkComboBox" id="system-sleep-mode-on-battery">
+                                 <property name="visible">True</property>
+                                 <property name="can_focus">False</property>
+-                                <property name="hexpand">True</property>
+                                 <signal name="changed" handler="on_battery_sleep_mode_changed_cb" swapped="no"/>
+                                 <child>
+                                   <object class="GtkCellRendererText" id="renderer8"/>
+@@ -909,7 +950,6 @@
+                               <object class="GtkComboBox" id="system-sleep-mode-on-ac">
+                                 <property name="visible">True</property>
+                                 <property name="can_focus">False</property>
+-                                <property name="hexpand">True</property>
+                                 <signal name="changed" handler="on_ac_sleep_mode_changed_cb" swapped="no"/>
+                                 <child>
+                                   <object class="GtkCellRendererText" id="renderer2"/>
+@@ -927,6 +967,8 @@
+                               <placeholder/>
+                             </child>
+                           </object>
++</child>
++</object>
+                         </child>
+                         <child type="label">
+                           <object class="GtkLabel" id="label8">
+@@ -950,16 +992,19 @@
+                         <property name="label_xalign">0</property>
+                         <property name="shadow_type">none</property>
+                         <child>
+-                          <object class="GtkBox" id="vbox4">
++<object class="GtkAlignment" id="alignment5">
++<property name="visible">True</property>
++<property name="can_focus">False</property>
++<property name="left_padding">18</property>
++<property name="top_padding">6</property>
++<property name="bottom_padding">12</property>
++<child>
++                          <object class="GtkVBox" id="vbox4">
+                             <property name="visible">True</property>
+                             <property name="can_focus">False</property>
+-                            <property name="margin_start">18</property>
+-                            <property name="margin_top">6</property>
+-                            <property name="margin_bottom">12</property>
+-                            <property name="orientation">vertical</property>
+                             <property name="spacing">3</property>
+                             <child>
+-                              <object class="GtkBox" id="hbox2">
++                              <object class="GtkHBox" id="hbox2">
+                                 <property name="visible">True</property>
+                                 <property name="can_focus">False</property>
+                                 <property name="spacing">6</property>
+@@ -995,7 +1040,7 @@
+                                   </packing>
+                                 </child>
+                                 <child>
+-                                  <object class="GtkLabel">
++                                  <object class="GtkLabel" id="label6">
+                                     <property name="visible">True</property>
+                                     <property name="can_focus">False</property>
+                                     <property name="label" translatable="yes">%</property>
+@@ -1014,7 +1059,7 @@
+                               </packing>
+                             </child>
+                             <child>
+-                              <object class="GtkBox" id="hbox3">
++                              <object class="GtkHBox" id="hbox3">
+                                 <property name="visible">True</property>
+                                 <property name="can_focus">False</property>
+                                 <property name="spacing">6</property>
+@@ -1057,6 +1102,8 @@
+                               </packing>
+                             </child>
+                           </object>
++</child>
++</object>
+                         </child>
+                         <child type="label">
+                           <object class="GtkLabel" id="label9">
+@@ -1080,13 +1127,16 @@
+                         <property name="label_xalign">0</property>
+                         <property name="shadow_type">none</property>
+                         <child>
+-                          <object class="GtkBox" id="vbox11">
++<object class="GtkAlignment" id="alignment6">
++<property name="visible">True</property>
++<property name="can_focus">False</property>
++<property name="left_padding">6</property>
++<property name="top_padding">6</property>
++<property name="bottom_padding">12</property>
++<child>
++                          <object class="GtkVBox" id="vbox11">
+                             <property name="visible">True</property>
+                             <property name="can_focus">False</property>
+-                            <property name="margin_start">6</property>
+-                            <property name="margin_top">6</property>
+-                            <property name="margin_bottom">12</property>
+-                            <property name="orientation">vertical</property>
+                             <property name="spacing">6</property>
+                             <child>
+                               <object class="GtkCheckButton" id="lock-screen">
+@@ -1104,6 +1154,8 @@
+                               </packing>
+                             </child>
+                           </object>
++</child>
++</object>
+                         </child>
+                         <child type="label">
+                           <object class="GtkLabel" id="label5">
+@@ -1137,19 +1189,17 @@
+                   </packing>
+                 </child>
+                 <child>
+-                  <object class="GtkBox" id="vbox6">
++                  <object class="GtkVBox" id="vbox6">
+                     <property name="visible">True</property>
+                     <property name="can_focus">False</property>
+                     <property name="border_width">12</property>
+-                    <property name="orientation">vertical</property>
+                     <property name="spacing">18</property>
+                     <child>
+-                      <object class="GtkBox" id="dpms-frame">
++                      <object class="GtkVBox" id="dpms-frame">
+                         <property name="visible">True</property>
+                         <property name="can_focus">False</property>
+-                        <property name="orientation">vertical</property>
+                         <child>
+-                          <object class="GtkBox" id="box3">
++                          <object class="GtkHBox" id="box3">
+                             <property name="visible">True</property>
+                             <property name="can_focus">False</property>
+                             <child>
+@@ -1166,11 +1216,11 @@
+                               </packing>
+                             </child>
+                             <child>
+-                              <object class="GtkSwitch" id="handle-dpms">
++                              <object class="GtkCheckButton" id="handle-dpms">
+                                 <property name="visible">True</property>
+                                 <property name="can_focus">True</property>
+                                 <property name="tooltip_text" translatable="yes">Let the power manager handle display power management (DPMS) instead of X11.</property>
+-                                <signal name="state-set" handler="dpms_toggled_cb" swapped="no"/>
++                                <signal name="toggled" handler="dpms_toggled_cb" swapped="no"/>
+                               </object>
+                               <packing>
+                                 <property name="expand">False</property>
+@@ -1187,18 +1237,21 @@
+                           </packing>
+                         </child>
+                         <child>
+-                          <object class="GtkBox" id="hbox7">
++<object class="GtkAlignment" id="alignment7">
++<property name="visible">True</property>
++<property name="can_focus">False</property>
++<property name="left_padding">18</property>
++<property name="top_padding">12</property>
++<property name="bottom_padding">12</property>
++<child>
++                          <object class="GtkHBox" id="hbox7">
+                             <property name="visible">True</property>
+                             <property name="can_focus">False</property>
+-                            <property name="margin_start">18</property>
+-                            <property name="margin_top">12</property>
+-                            <property name="margin_bottom">12</property>
+                             <property name="spacing">6</property>
+                             <child>
+-                              <object class="GtkBox" id="vbox13">
++                              <object class="GtkVBox" id="vbox13">
+                                 <property name="visible">True</property>
+                                 <property name="can_focus">False</property>
+-                                <property name="orientation">vertical</property>
+                                 <property name="homogeneous">True</property>
+                                 <child>
+                                   <object class="GtkLabel" id="display-blank-label">
+@@ -1247,22 +1300,20 @@
+                               </packing>
+                             </child>
+                             <child>
+-                              <object class="GtkBox" id="vbox14">
++                              <object class="GtkVBox" id="vbox14">
+                                 <property name="visible">True</property>
+                                 <property name="can_focus">False</property>
+-                                <property name="orientation">vertical</property>
+                                 <property name="homogeneous">True</property>
+                                 <child>
+-                                  <object class="GtkBox" id="hbox9">
++                                  <object class="GtkHBox" id="hbox9">
+                                     <property name="visible">True</property>
+                                     <property name="can_focus">False</property>
+                                     <property name="spacing">6</property>
+                                     <property name="homogeneous">True</property>
+                                     <child>
+-                                      <object class="GtkBox" id="display-blank-on-battery-vbox">
++                                      <object class="GtkVBox" id="display-blank-on-battery-vbox">
+                                         <property name="visible">True</property>
+                                         <property name="can_focus">False</property>
+-                                        <property name="orientation">vertical</property>
+                                         <child>
+                                           <object class="GtkLabel" id="dpms-on-battery-header">
+                                             <property name="visible">True</property>
+@@ -1278,12 +1329,11 @@
+                                           </packing>
+                                         </child>
+                                         <child>
+-                                          <object class="GtkBox">
++                                          <object class="GtkVBox" id="vbox9">
+                                             <property name="visible">True</property>
+                                             <property name="can_focus">False</property>
+-                                            <property name="orientation">vertical</property>
+                                             <child>
+-                                              <object class="GtkScale" id="display-blank-on-battery">
++                                              <object class="GtkHScale" id="display-blank-on-battery">
+                                                 <property name="visible">True</property>
+                                                 <property name="can_focus">True</property>
+                                                 <property name="adjustment">display-blank-on-battery-adjustment</property>
+@@ -1291,9 +1341,6 @@
+                                                 <property name="digits">0</property>
+                                                 <property name="draw_value">False</property>
+                                                 <signal name="value-changed" handler="display_blank_on_battery_value_changed_cb" swapped="no"/>
+-                                                <style>
+-                                                  <class name="xfce4-scale-label"/>
+-                                                </style>
+                                               </object>
+                                               <packing>
+                                                 <property name="expand">False</property>
+@@ -1329,10 +1376,9 @@
+                                       </packing>
+                                     </child>
+                                     <child>
+-                                      <object class="GtkBox" id="vbox17">
++                                      <object class="GtkVBox" id="vbox17">
+                                         <property name="visible">True</property>
+                                         <property name="can_focus">False</property>
+-                                        <property name="orientation">vertical</property>
+                                         <child>
+                                           <object class="GtkLabel" id="dpms-plugged-in-header">
+                                             <property name="visible">True</property>
+@@ -1348,12 +1394,11 @@
+                                           </packing>
+                                         </child>
+                                         <child>
+-                                          <object class="GtkBox">
++                                          <object class="GtkVBox" id="vbox16">
+                                             <property name="visible">True</property>
+                                             <property name="can_focus">False</property>
+-                                            <property name="orientation">vertical</property>
+                                             <child>
+-                                              <object class="GtkScale" id="display-blank-on-ac">
++                                              <object class="GtkHScale" id="display-blank-on-ac">
+                                                 <property name="visible">True</property>
+                                                 <property name="can_focus">True</property>
+                                                 <property name="adjustment">display-blank-on-ac-adjustment</property>
+@@ -1361,9 +1406,6 @@
+                                                 <property name="digits">0</property>
+                                                 <property name="draw_value">False</property>
+                                                 <signal name="value-changed" handler="display_blank_on_ac_value_changed_cb" swapped="no"/>
+-                                                <style>
+-                                                  <class name="xfce4-scale-label"/>
+-                                                </style>
+                                               </object>
+                                               <packing>
+                                                 <property name="expand">False</property>
+@@ -1406,19 +1448,23 @@
+                                   </packing>
+                                 </child>
+                                 <child>
+-                                  <object class="GtkBox" id="hbox10">
++<object class="GtkAlignment" id="alignment13">
++<property name="visible">True</property>
++<property name="can_focus">False</property>
++<property name="yalign">0.5</property>
++<property name="yscale">0</property>
++<child>
++                                  <object class="GtkHBox" id="hbox10">
+                                     <property name="visible">True</property>
+                                     <property name="can_focus">False</property>
+-                                    <property name="valign">center</property>
+                                     <property name="spacing">6</property>
+                                     <property name="homogeneous">True</property>
+                                     <child>
+-                                      <object class="GtkBox">
++                                      <object class="GtkVBox" id="vbox20">
+                                         <property name="visible">True</property>
+                                         <property name="can_focus">False</property>
+-                                        <property name="orientation">vertical</property>
+                                         <child>
+-                                          <object class="GtkScale" id="dpms-sleep-on-battery">
++                                          <object class="GtkHScale" id="dpms-sleep-on-battery">
+                                             <property name="visible">True</property>
+                                             <property name="can_focus">True</property>
+                                             <property name="adjustment">dpms-sleep-on-battery-adjustment</property>
+@@ -1426,9 +1472,6 @@
+                                             <property name="digits">0</property>
+                                             <property name="draw_value">False</property>
+                                             <signal name="value-changed" handler="sleep_on_battery_value_changed_cb" swapped="no"/>
+-                                            <style>
+-                                              <class name="xfce4-scale-label"/>
+-                                            </style>
+                                           </object>
+                                           <packing>
+                                             <property name="expand">False</property>
+@@ -1457,12 +1500,11 @@
+                                       </packing>
+                                     </child>
+                                     <child>
+-                                      <object class="GtkBox">
++                                      <object class="GtkVBox" id="vbox21">
+                                         <property name="visible">True</property>
+                                         <property name="can_focus">False</property>
+-                                        <property name="orientation">vertical</property>
+                                         <child>
+-                                          <object class="GtkScale" id="dpms-sleep-on-ac">
++                                          <object class="GtkHScale" id="dpms-sleep-on-ac">
+                                             <property name="visible">True</property>
+                                             <property name="can_focus">True</property>
+                                             <property name="adjustment">dpms-sleep-on-ac-adjustment</property>
+@@ -1470,9 +1512,6 @@
+                                             <property name="digits">0</property>
+                                             <property name="draw_value">False</property>
+                                             <signal name="value-changed" handler="sleep_on_ac_value_changed_cb" swapped="no"/>
+-                                            <style>
+-                                              <class name="xfce4-scale-label"/>
+-                                            </style>
+                                           </object>
+                                           <packing>
+                                             <property name="expand">False</property>
+@@ -1501,6 +1540,8 @@
+                                       </packing>
+                                     </child>
+                                   </object>
++</child>
++</object>
+                                   <packing>
+                                     <property name="expand">True</property>
+                                     <property name="fill">True</property>
+@@ -1508,19 +1549,23 @@
+                                   </packing>
+                                 </child>
+                                 <child>
+-                                  <object class="GtkBox" id="hbox11">
++<object class="GtkAlignment" id="alignment14">
++<property name="visible">True</property>
++<property name="can_focus">False</property>
++<property name="yalign">0.5</property>
++<property name="yscale">0</property>
++<child>
++                                  <object class="GtkHBox" id="hbox11">
+                                     <property name="visible">True</property>
+                                     <property name="can_focus">False</property>
+-                                    <property name="valign">center</property>
+                                     <property name="spacing">6</property>
+                                     <property name="homogeneous">True</property>
+                                     <child>
+-                                      <object class="GtkBox">
++                                      <object class="GtkVBox" id="vbox22">
+                                         <property name="visible">True</property>
+                                         <property name="can_focus">False</property>
+-                                        <property name="orientation">vertical</property>
+                                         <child>
+-                                          <object class="GtkScale" id="dpms-off-on-battery">
++                                          <object class="GtkHScale" id="dpms-off-on-battery">
+                                             <property name="visible">True</property>
+                                             <property name="can_focus">True</property>
+                                             <property name="adjustment">dpms-off-on-battery-adjustment</property>
+@@ -1528,9 +1573,6 @@
+                                             <property name="digits">0</property>
+                                             <property name="draw_value">False</property>
+                                             <signal name="value-changed" handler="off_on_battery_value_changed_cb" swapped="no"/>
+-                                            <style>
+-                                              <class name="xfce4-scale-label"/>
+-                                            </style>
+                                           </object>
+                                           <packing>
+                                             <property name="expand">False</property>
+@@ -1559,12 +1601,11 @@
+                                       </packing>
+                                     </child>
+                                     <child>
+-                                      <object class="GtkBox">
++                                      <object class="GtkVBox" id="vbox23">
+                                         <property name="visible">True</property>
+                                         <property name="can_focus">False</property>
+-                                        <property name="orientation">vertical</property>
+                                         <child>
+-                                          <object class="GtkScale" id="dpms-off-on-ac">
++                                          <object class="GtkHScale" id="dpms-off-on-ac">
+                                             <property name="visible">True</property>
+                                             <property name="can_focus">True</property>
+                                             <property name="adjustment">dpms-off-on-ac-adjustment</property>
+@@ -1572,9 +1613,6 @@
+                                             <property name="digits">0</property>
+                                             <property name="draw_value">False</property>
+                                             <signal name="value-changed" handler="off_on_ac_value_changed_cb" swapped="no"/>
+-                                            <style>
+-                                              <class name="xfce4-scale-label"/>
+-                                            </style>
+                                           </object>
+                                           <packing>
+                                             <property name="expand">False</property>
+@@ -1603,6 +1641,8 @@
+                                       </packing>
+                                     </child>
+                                   </object>
++</child>
++</object>
+                                   <packing>
+                                     <property name="expand">True</property>
+                                     <property name="fill">True</property>
+@@ -1617,6 +1657,8 @@
+                               </packing>
+                             </child>
+                           </object>
++</child>
++</object>
+                           <packing>
+                             <property name="expand">False</property>
+                             <property name="fill">True</property>
+@@ -1637,22 +1679,24 @@
+                         <property name="label_xalign">0</property>
+                         <property name="shadow_type">none</property>
+                         <child>
+-                          <object class="GtkBox" id="vbox5">
++<object class="GtkAlignment" id="alignment8">
++<property name="visible">True</property>
++<property name="can_focus">False</property>
++<property name="left_padding">18</property>
++<property name="bottom_padding">12</property>
++<child>
++                          <object class="GtkVBox" id="vbox5">
+                             <property name="visible">True</property>
+                             <property name="can_focus">False</property>
+-                            <property name="margin_start">18</property>
+-                            <property name="margin_bottom">12</property>
+-                            <property name="orientation">vertical</property>
+                             <child>
+-                              <object class="GtkBox" id="hbox1">
++                              <object class="GtkHBox" id="hbox1">
+                                 <property name="visible">True</property>
+                                 <property name="can_focus">False</property>
+                                 <property name="spacing">6</property>
+                                 <child>
+-                                  <object class="GtkBox" id="vbox12">
++                                  <object class="GtkVBox" id="vbox12">
+                                     <property name="visible">True</property>
+                                     <property name="can_focus">False</property>
+-                                    <property name="orientation">vertical</property>
+                                     <property name="homogeneous">True</property>
+                                     <child>
+                                       <object class="GtkLabel" id="brightness-level-label">
+@@ -1688,23 +1732,26 @@
+                                   </packing>
+                                 </child>
+                                 <child>
+-                                  <object class="GtkBox" id="vbox15">
++                                  <object class="GtkVBox" id="vbox15">
+                                     <property name="visible">True</property>
+                                     <property name="can_focus">False</property>
+-                                    <property name="orientation">vertical</property>
+                                     <property name="homogeneous">True</property>
+                                     <child>
+-                                      <object class="GtkBox" id="hbox5">
++<object class="GtkAlignment" id="alignment15">
++<property name="visible">True</property>
++<property name="can_focus">False</property>
++<property name="yalign">0.5</property>
++<property name="yscale">0</property>
++<child>
++                                      <object class="GtkHBox" id="hbox5">
+                                         <property name="visible">True</property>
+                                         <property name="can_focus">False</property>
+-                                        <property name="valign">center</property>
+                                         <property name="spacing">6</property>
+                                         <property name="homogeneous">True</property>
+                                         <child>
+-                                          <object class="GtkBox" id="vbox18">
++                                          <object class="GtkVBox" id="vbox18">
+                                             <property name="visible">True</property>
+                                             <property name="can_focus">False</property>
+-                                            <property name="orientation">vertical</property>
+                                             <child>
+                                               <object class="GtkLabel" id="brightness-on-battery-header">
+                                                 <property name="visible">True</property>
+@@ -1720,12 +1767,11 @@
+                                               </packing>
+                                             </child>
+                                             <child>
+-                                              <object class="GtkBox">
++                                              <object class="GtkVBox" id="vbox24">
+                                                 <property name="visible">True</property>
+                                                 <property name="can_focus">False</property>
+-                                                <property name="orientation">vertical</property>
+                                                 <child>
+-                                                  <object class="GtkScale" id="brightness-level-on-battery">
++                                                  <object class="GtkHScale" id="brightness-level-on-battery">
+                                                     <property name="visible">True</property>
+                                                     <property name="can_focus">True</property>
+                                                     <property name="adjustment">brightness-level-on-battery-adjustment</property>
+@@ -1733,9 +1779,6 @@
+                                                     <property name="digits">0</property>
+                                                     <property name="draw_value">False</property>
+                                                     <signal name="value-changed" handler="brightness_level_on_battery" swapped="no"/>
+-                                                    <style>
+-                                                      <class name="xfce4-scale-label"/>
+-                                                    </style>
+                                                   </object>
+                                                   <packing>
+                                                     <property name="expand">False</property>
+@@ -1771,10 +1814,9 @@
+                                           </packing>
+                                         </child>
+                                         <child>
+-                                          <object class="GtkBox" id="vbox19">
++                                          <object class="GtkVBox" id="vbox19">
+                                             <property name="visible">True</property>
+                                             <property name="can_focus">False</property>
+-                                            <property name="orientation">vertical</property>
+                                             <child>
+                                               <object class="GtkLabel" id="brightness-plugged-in-header">
+                                                 <property name="visible">True</property>
+@@ -1790,12 +1832,11 @@
+                                               </packing>
+                                             </child>
+                                             <child>
+-                                              <object class="GtkBox">
++                                              <object class="GtkVBox" id="vbox25">
+                                                 <property name="visible">True</property>
+                                                 <property name="can_focus">False</property>
+-                                                <property name="orientation">vertical</property>
+                                                 <child>
+-                                                  <object class="GtkScale" id="brightness-level-on-ac">
++                                                  <object class="GtkHScale" id="brightness-level-on-ac">
+                                                     <property name="visible">True</property>
+                                                     <property name="can_focus">True</property>
+                                                     <property name="adjustment">brightness-level-on-ac-adjustment</property>
+@@ -1803,9 +1844,6 @@
+                                                     <property name="digits">0</property>
+                                                     <property name="draw_value">False</property>
+                                                     <signal name="value-changed" handler="brightness_level_on_ac" swapped="no"/>
+-                                                    <style>
+-                                                      <class name="xfce4-scale-label"/>
+-                                                    </style>
+                                                   </object>
+                                                   <packing>
+                                                     <property name="expand">False</property>
+@@ -1841,6 +1879,8 @@
+                                           </packing>
+                                         </child>
+                                       </object>
++</child>
++</object>
+                                       <packing>
+                                         <property name="expand">True</property>
+                                         <property name="fill">True</property>
+@@ -1848,19 +1888,23 @@
+                                       </packing>
+                                     </child>
+                                     <child>
+-                                      <object class="GtkBox" id="hbox6">
++<object class="GtkAlignment" id="alignment16">
++<property name="visible">True</property>
++<property name="can_focus">False</property>
++<property name="yalign">0.5</property>
++<property name="yscale">0</property>
++<child>
++                                      <object class="GtkHBox" id="hbox6">
+                                         <property name="visible">True</property>
+                                         <property name="can_focus">False</property>
+-                                        <property name="valign">center</property>
+                                         <property name="spacing">6</property>
+                                         <property name="homogeneous">True</property>
+                                         <child>
+-                                          <object class="GtkBox">
++                                          <object class="GtkVBox" id="vbox26">
+                                             <property name="visible">True</property>
+                                             <property name="can_focus">False</property>
+-                                            <property name="orientation">vertical</property>
+                                             <child>
+-                                              <object class="GtkScale" id="brightness-inactivity-on-battery">
++                                              <object class="GtkHScale" id="brightness-inactivity-on-battery">
+                                                 <property name="visible">True</property>
+                                                 <property name="can_focus">True</property>
+                                                 <property name="adjustment">brightness-inactivity-on-battery-adjustment</property>
+@@ -1868,9 +1912,6 @@
+                                                 <property name="digits">0</property>
+                                                 <property name="draw_value">False</property>
+                                                 <signal name="value-changed" handler="brightness_on_battery_value_changed_cb" swapped="no"/>
+-                                                <style>
+-                                                  <class name="xfce4-scale-label"/>
+-                                                </style>
+                                               </object>
+                                               <packing>
+                                                 <property name="expand">False</property>
+@@ -1899,12 +1940,11 @@
+                                           </packing>
+                                         </child>
+                                         <child>
+-                                          <object class="GtkBox">
++                                          <object class="GtkVBox" id="vbox27">
+                                             <property name="visible">True</property>
+                                             <property name="can_focus">False</property>
+-                                            <property name="orientation">vertical</property>
+                                             <child>
+-                                              <object class="GtkScale" id="brightness-inactivity-on-ac">
++                                              <object class="GtkHScale" id="brightness-inactivity-on-ac">
+                                                 <property name="visible">True</property>
+                                                 <property name="can_focus">True</property>
+                                                 <property name="adjustment">brightness-inactivity-on-ac-adjustment</property>
+@@ -1912,9 +1952,6 @@
+                                                 <property name="digits">0</property>
+                                                 <property name="draw_value">False</property>
+                                                 <signal name="value-changed" handler="brightness_on_ac_value_changed_cb" swapped="no"/>
+-                                                <style>
+-                                                  <class name="xfce4-scale-label"/>
+-                                                </style>
+                                               </object>
+                                               <packing>
+                                                 <property name="expand">False</property>
+@@ -1943,6 +1980,8 @@
+                                           </packing>
+                                         </child>
+                                       </object>
++</child>
++</object>
+                                       <packing>
+                                         <property name="expand">True</property>
+                                         <property name="fill">True</property>
+@@ -1964,6 +2003,8 @@
+                               </packing>
+                             </child>
+                           </object>
++</child>
++</object>
+                         </child>
+                         <child type="label">
+                           <object class="GtkLabel" id="label4">
+@@ -1997,11 +2038,10 @@
+                   </packing>
+                 </child>
+                 <child>
+-                  <object class="GtkBox" id="light-locker-vbox1">
++                  <object class="GtkVBox" id="light-locker-vbox1">
+                     <property name="visible">True</property>
+                     <property name="can_focus">False</property>
+                     <property name="border_width">12</property>
+-                    <property name="orientation">vertical</property>
+                     <property name="spacing">6</property>
+                     <child>
+                       <object class="GtkFrame" id="light-locker-frame">
+@@ -2010,16 +2050,19 @@
+                         <property name="label_xalign">0</property>
+                         <property name="shadow_type">none</property>
+                         <child>
+-                          <object class="GtkBox" id="light-locker-vbox2">
++<object class="GtkAlignment" id="alignment9">
++<property name="visible">True</property>
++<property name="can_focus">False</property>
++<property name="left_padding">18</property>
++<property name="top_padding">6</property>
++<property name="bottom_padding">18</property>
++<child>
++                          <object class="GtkVBox" id="light-locker-vbox2">
+                             <property name="visible">True</property>
+                             <property name="can_focus">False</property>
+-                            <property name="margin_start">18</property>
+-                            <property name="margin_top">6</property>
+-                            <property name="margin_bottom">18</property>
+-                            <property name="orientation">vertical</property>
+                             <property name="spacing">5</property>
+                             <child>
+-                              <object class="GtkGrid" id="light-locker-table">
++                              <object class="GtkTable" id="light-locker-table">
+                                 <property name="visible">True</property>
+                                 <property name="can_focus">False</property>
+                                 <property name="row_spacing">6</property>
+@@ -2068,12 +2111,11 @@
+                                   </packing>
+                                 </child>
+                                 <child>
+-                                  <object class="GtkBox">
++                                  <object class="GtkVBox" id="vbox28">
+                                     <property name="visible">True</property>
+                                     <property name="can_focus">False</property>
+-                                    <property name="orientation">vertical</property>
+                                     <child>
+-                                      <object class="GtkScale" id="light-locker-late-locking-scale">
++                                      <object class="GtkHScale" id="light-locker-late-locking-scale">
+                                         <property name="visible">True</property>
+                                         <property name="can_focus">True</property>
+                                         <property name="adjustment">light-locker-late-locking-adjustment</property>
+@@ -2081,9 +2123,6 @@
+                                         <property name="digits">0</property>
+                                         <property name="draw_value">False</property>
+                                         <signal name="value-changed" handler="light_locker_late_locking_value_changed_cb" swapped="no"/>
+-                                        <style>
+-                                          <class name="xfce4-scale-label"/>
+-                                        </style>
+                                       </object>
+                                       <packing>
+                                         <property name="expand">False</property>
+@@ -2135,6 +2174,8 @@
+                               </packing>
+                             </child>
+                           </object>
++</child>
++</object>
+                         </child>
+                         <child type="label">
+                           <object class="GtkLabel" id="light-locker-frame-label">
+diff --git a/panel-plugins/power-manager-plugin/power-manager-button.c b/panel-plugins/power-manager-plugin/power-manager-button.c
+index 3b8cddef..601b0aeb 100644
+--- a/panel-plugins/power-manager-plugin/power-manager-button.c
++++ b/panel-plugins/power-manager-plugin/power-manager-button.c
+@@ -136,7 +136,7 @@ G_DEFINE_TYPE_WITH_PRIVATE (PowerManagerButton, power_manager_button, GTK_TYPE_T
+ 
+ static void power_manager_button_finalize   (GObject *object);
+ static GList* find_device_in_list (PowerManagerButton *button, const gchar *object_path);
+-static gboolean power_manager_button_device_icon_draw (GtkWidget *img, cairo_t *cr, gpointer userdata);
++static gboolean power_manager_button_device_icon_expose (GtkWidget *img, GdkEventExpose *event, gpointer userdata);
+ static void power_manager_button_set_icon (PowerManagerButton *button);
+ static void power_manager_button_set_label (PowerManagerButton *button, gdouble percentage, guint64 time_to_empty_or_full);
+ static void power_manager_button_update_label (PowerManagerButton *button, UpDevice *device);
+@@ -328,8 +328,9 @@ power_manager_button_set_label (PowerManagerButton *button, gdouble percentage,
+ }
+ 
+ static gboolean
+-power_manager_button_device_icon_draw (GtkWidget *img, cairo_t *cr, gpointer userdata)
++power_manager_button_device_icon_expose (GtkWidget *img, GdkEventExpose *event, gpointer userdata)
+ {
++    cairo_t *cr;
+     UpDevice *device = NULL;
+     guint type = 0, state = 0;
+     gdouble percentage;
+@@ -366,6 +367,7 @@ power_manager_button_device_icon_draw (GtkWidget *img, cairo_t *cr, gpointer use
+         state = UP_DEVICE_STATE_UNKNOWN;
+     }
+ 
++    cr = gdk_cairo_create (img->window);
+     gtk_widget_get_allocation (img, &allocation);
+ 
+     width = allocation.width;
+@@ -423,6 +425,7 @@ power_manager_button_device_icon_draw (GtkWidget *img, cairo_t *cr, gpointer use
+         pango_cairo_show_layout (cr, layout);
+     }
+ 
++    cairo_destroy (cr);
+     if (layout)
+         g_object_unref (layout);
+     return FALSE;
+@@ -514,8 +517,8 @@ G_GNUC_BEGIN_IGNORE_DEPRECATIONS
+         gtk_image_menu_item_set_image(GTK_IMAGE_MENU_ITEM(battery_device->menu_item), battery_device->img);
+ G_GNUC_END_IGNORE_DEPRECATIONS
+         battery_device->expose_signal_id = g_signal_connect_after (G_OBJECT (battery_device->img),
+-                                                                   "draw",
+-                                                                   G_CALLBACK (power_manager_button_device_icon_draw),
++                                                                   "expose-event",
++                                                                   G_CALLBACK (power_manager_button_device_icon_expose),
+                                                                    device);
+     }
+ }
+@@ -921,7 +924,6 @@ static void
+ power_manager_button_init (PowerManagerButton *button)
+ {
+     GError *error = NULL;
+-    GtkCssProvider *css_provider;
+ 
+     button->priv = power_manager_button_get_instance_private (button);
+ 
+@@ -972,15 +974,6 @@ power_manager_button_init (PowerManagerButton *button)
+ #endif
+     button->priv->panel_icon_width = 24;
+ 
+-    /* Sane default Gtk style */
+-    css_provider = gtk_css_provider_new ();
+-    gtk_css_provider_load_from_data (css_provider,
+-                                     "#xfce4-power-manager-plugin {"
+-                                     "padding: 1px;"
+-                                     "border-width: 1px;}",
+-                                     -1, NULL);
+-    gtk_style_context_add_provider (GTK_STYLE_CONTEXT (gtk_widget_get_style_context (GTK_WIDGET (button))),
+-                                    GTK_STYLE_PROVIDER (css_provider), GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+     /* Intercept scroll events */
+     gtk_widget_add_events (GTK_WIDGET (button), GDK_SCROLL_MASK);
+ 
+@@ -1069,8 +1062,6 @@ static void
+ power_manager_button_size_changed_cb (XfcePanelPlugin *plugin, gint size, PowerManagerButton *button)
+ {
+ #if !LIBXFCE4PANEL_CHECK_VERSION (4, 13, 0)
+-    GtkStyleContext *context;
+-    GtkBorder padding, border;
+     gint width;
+     gint xthickness;
+     gint ythickness;
+@@ -1085,13 +1076,8 @@ power_manager_button_size_changed_cb (XfcePanelPlugin *plugin, gint size, PowerM
+ #if LIBXFCE4PANEL_CHECK_VERSION (4, 13, 0)
+     button->priv->panel_icon_width = xfce_panel_plugin_get_icon_size (plugin);
+ #else
+-    /* Calculate the size of the widget because the theme can override it */
+-    context = gtk_widget_get_style_context (GTK_WIDGET (button));
+-    gtk_style_context_get_padding (context, gtk_widget_get_state_flags (GTK_WIDGET (button)), &padding);
+-    gtk_style_context_get_border (context, gtk_widget_get_state_flags (GTK_WIDGET (button)), &border);
+-    xthickness = padding.left + padding.right + border.left + border.right;
+-    ythickness = padding.top + padding.bottom + border.top + border.bottom;
+-
++    xthickness = gtk_widget_get_style (GTK_WIDGET (button))->xthickness;
++    ythickness = gtk_widget_get_style (GTK_WIDGET (button))->ythickness;
+     /* Calculate the size of the space left for the icon */
+     width = size - 2 * MAX (xthickness, ythickness);
+ 
+@@ -1108,7 +1094,10 @@ power_manager_button_size_changed_cb (XfcePanelPlugin *plugin, gint size, PowerM
+ #endif
+ 
+     /* resize the plugin */
+-    gtk_widget_set_size_request (GTK_WIDGET (plugin), size, size);
++    if (gtk_widget_get_visible (button->priv->panel_label))
++      gtk_widget_set_size_request (GTK_WIDGET (plugin), -1, -1);
++    else
++      gtk_widget_set_size_request (GTK_WIDGET (plugin), size, size);
+     power_manager_button_set_icon (button);
+ 
+     /* resize the plugin button too */
+@@ -1116,9 +1105,9 @@ power_manager_button_size_changed_cb (XfcePanelPlugin *plugin, gint size, PowerM
+ }
+ 
+ static void
+-power_manager_button_style_update_cb (XfcePanelPlugin *plugin, PowerManagerButton *button)
++power_manager_button_style_update_cb (XfcePanelPlugin *plugin, GtkStyle *previous_style, PowerManagerButton *button)
+ {
+-    gtk_widget_reset_style (GTK_WIDGET (plugin));
++    gtk_widget_reset_rc_styles (GTK_WIDGET (plugin));
+     power_manager_button_size_changed_cb (plugin, xfce_panel_plugin_get_size (plugin), button);
+ }
+ 
+@@ -1150,7 +1139,7 @@ power_manager_button_show (PowerManagerButton *button)
+ 
+     button->priv->panel_icon_image = gtk_image_new ();
+     button->priv->panel_label = gtk_label_new ("");
+-    hbox = gtk_box_new (GTK_ORIENTATION_HORIZONTAL, 0);
++    hbox = gtk_hbox_new (FALSE, 0);
+     gtk_box_pack_start (GTK_BOX (hbox), GTK_WIDGET (button->priv->panel_icon_image), TRUE, FALSE, 0);
+     gtk_box_pack_start (GTK_BOX (hbox), GTK_WIDGET (button->priv->panel_label), TRUE, FALSE, 0);
+ 
+@@ -1163,7 +1152,7 @@ power_manager_button_show (PowerManagerButton *button)
+     g_signal_connect (button->priv->plugin, "size-changed",
+                       G_CALLBACK (power_manager_button_size_changed_cb), button);
+ 
+-    g_signal_connect (button->priv->plugin, "style-updated",
++    g_signal_connect (button->priv->plugin, "style-set",
+                       G_CALLBACK (power_manager_button_style_update_cb), button);
+ 
+     g_signal_connect (button->priv->plugin, "free-data",
+@@ -1199,8 +1188,10 @@ power_manager_button_update_label (PowerManagerButton *button, UpDevice *device)
+                                               button);
+         return;
+     }
+-    else
+-        gtk_widget_show (GTK_WIDGET (button->priv->panel_label));
++    gtk_widget_show (GTK_WIDGET (button->priv->panel_label));
++    power_manager_button_size_changed_cb (button->priv->plugin,
++                                          xfce_panel_plugin_get_size (button->priv->plugin),
++                                          button);
+ #endif
+ 
+     g_object_get (device,
+@@ -1318,8 +1309,8 @@ G_GNUC_END_IGNORE_DEPRECATIONS
+     battery_device->menu_item = mi;
+     g_signal_connect(G_OBJECT (mi), "destroy", G_CALLBACK (menu_item_destroyed_cb), button);
+     battery_device->expose_signal_id = g_signal_connect_after (G_OBJECT (battery_device->img),
+-                                                               "draw",
+-                                                               G_CALLBACK (power_manager_button_device_icon_draw),
++                                                               "expose-event",
++                                                               G_CALLBACK (power_manager_button_device_icon_expose),
+                                                                battery_device->device);
+ 
+     /* Active calls xfpm settings with the device's id to display details */
+@@ -1545,26 +1536,11 @@ range_scroll_cb (GtkWidget *widget, GdkEvent *event, PowerManagerButton *button)
+ static void
+ range_show_cb (GtkWidget *widget, PowerManagerButton *button)
+ {
+-#if !GTK_CHECK_VERSION (3, 20, 0)
+-    GdkDeviceManager* manager = gdk_display_get_device_manager (gdk_display_get_default());
+-    GdkDevice* pointer = gdk_device_manager_get_client_pointer (manager);
+-#else
+-    GdkSeat   *seat = gdk_display_get_default_seat (gdk_display_get_default());
+-    GdkDevice *pointer = gdk_seat_get_pointer (seat);
+-#endif
+-
+     TRACE("entering");
+     /* Release these grabs as they will cause a lockup if pkexec is called
+      * for the brightness helper */
+-    if (pointer)
+-    {
+-#if !GTK_CHECK_VERSION (3, 20, 0)
+-        gdk_device_ungrab (pointer, GDK_CURRENT_TIME);
+-#else
+-        gdk_seat_ungrab (seat);
+-#endif
+-    }
+-
++    gdk_pointer_ungrab (GDK_CURRENT_TIME);
++    gdk_keyboard_ungrab (GDK_CURRENT_TIME);
+     gtk_grab_remove (widget);
+ }
+ 
+diff --git a/panel-plugins/power-manager-plugin/scalemenuitem.c b/panel-plugins/power-manager-plugin/scalemenuitem.c
+index 13383b15..b2ec2607 100644
+--- a/panel-plugins/power-manager-plugin/scalemenuitem.c
++++ b/panel-plugins/power-manager-plugin/scalemenuitem.c
+@@ -46,6 +46,8 @@ static gboolean scale_menu_item_motion_notify_event     (GtkWidget          *men
+                                                          GdkEventMotion     *event);
+ static gboolean scale_menu_item_grab_broken             (GtkWidget          *menuitem,
+                                                          GdkEventGrabBroken *event);
++static void     scale_menu_item_grab_notify             (GtkWidget          *menuitem,
++                                                         gboolean            was_grabbed);
+ static void     scale_menu_item_parent_set              (GtkWidget          *item,
+                                                          GtkWidget          *previous_parent);
+ static void     update_packing                          (ScaleMenuItem  *    self);
+@@ -107,6 +109,7 @@ scale_menu_item_class_init (ScaleMenuItemClass *item_class)
+   widget_class->button_release_event = scale_menu_item_button_release_event;
+   widget_class->motion_notify_event  = scale_menu_item_motion_notify_event;
+   widget_class->grab_broken_event    = scale_menu_item_grab_broken;
++  widget_class->grab_notify          = scale_menu_item_grab_notify;
+   widget_class->parent_set           = scale_menu_item_parent_set;
+ 
+ 
+@@ -170,8 +173,8 @@ static void
+ update_packing (ScaleMenuItem *self)
+ {
+   ScaleMenuItemPrivate *priv = scale_menu_item_get_instance_private (self);
+-  GtkWidget *hbox = gtk_box_new (GTK_ORIENTATION_HORIZONTAL, 0);
+-  GtkWidget *vbox = gtk_box_new (GTK_ORIENTATION_VERTICAL, 0);
++  GtkWidget *hbox = gtk_hbox_new (FALSE, 0);
++  GtkWidget *vbox = gtk_vbox_new (FALSE, 0);
+ 
+   TRACE("entering");
+ 
+@@ -234,6 +237,17 @@ scale_menu_item_init (ScaleMenuItem *self)
+ {
+ }
+ 
++#define gtk_widget_event_translate(widget, event, x, y) \
++{ \
++  gint _savex = event->x; \
++  gint _savey = event->y; \
++  event->x = x; \
++  event->y = y; \
++  gtk_widget_event (widget, (GdkEvent*) event); \
++  event->x = _savex; \
++  event->y = _savey; \
++}
++
+ static gboolean
+ scale_menu_item_button_press_event (GtkWidget      *menuitem,
+                                     GdkEventButton *event)
+@@ -248,8 +262,7 @@ scale_menu_item_button_press_event (GtkWidget      *menuitem,
+   gtk_widget_translate_coordinates (menuitem, priv->scale, event->x, event->y, &x, &y);
+ 
+   if (x > 0 && x < alloc.width && y > 0 && y < alloc.height)
+-    gtk_widget_event (priv->scale,
+-                      ((GdkEvent *)(void*)(event)));
++    gtk_widget_event_translate (priv->scale, event, x, y);
+ 
+   if (!priv->grabbed)
+     {
+@@ -273,6 +286,7 @@ scale_menu_item_button_release_event (GtkWidget *menuitem,
+   if (priv->grabbed)
+     {
+       priv->grabbed = FALSE;
++      scale_menu_item_grab_broken (menuitem, NULL);
+       g_signal_emit (menuitem, signals[SLIDER_RELEASED], 0);
+     }
+ 
+@@ -291,18 +305,8 @@ scale_menu_item_motion_notify_event (GtkWidget      *menuitem,
+   gtk_widget_get_allocation (priv->scale, &alloc);
+   gtk_widget_translate_coordinates (menuitem, priv->scale, event->x, event->y, &x, &y);
+ 
+-  /* don't translate coordinates when the scale has the "grab" -
+-   * GtkRange expects coords relative to its event window in that case
+-   */
+-  if (!priv->grabbed)
+-  {
+-    event->x = x;
+-    event->y = y;
+-  }
+-
+-  if (priv->grabbed ||
+-      (x > 0 && x < alloc.width && y > 0 && y < alloc.height))
+-    gtk_widget_event (scale, (GdkEvent*)event);
++  if (x > 0 && x < alloc.width && y > 0 && y < alloc.height)
++    gtk_widget_event_translate (scale, event, x, y);
+ 
+   return TRUE;
+ }
+@@ -320,6 +324,17 @@ scale_menu_item_grab_broken (GtkWidget *menuitem,
+   return TRUE;
+ }
+ 
++static void
++scale_menu_item_grab_notify (GtkWidget *menuitem,
++                             gboolean was_grabbed)
++{
++  ScaleMenuItemPrivate *priv = scale_menu_item_get_instance_private (SCALE_MENU_ITEM (menuitem));
++
++  TRACE("entering");
++
++  GTK_WIDGET_GET_CLASS (priv->scale)->grab_notify (priv->scale, was_grabbed);
++}
++
+ static void
+ menu_hidden (GtkWidget        *menu,
+              ScaleMenuItem *scale)
+@@ -369,7 +384,7 @@ scale_menu_item_new_with_range (gdouble           min,
+ 
+   priv = scale_menu_item_get_instance_private (scale_item);
+ 
+-  priv->scale = gtk_scale_new_with_range (GTK_ORIENTATION_HORIZONTAL, min, max, step);
++  priv->scale = gtk_hscale_new_with_range (min, max, step);
+   priv->vbox = NULL;
+   priv->hbox = NULL;
+ 
+@@ -483,7 +498,7 @@ scale_menu_item_set_description_label (ScaleMenuItem *menuitem,
+       gtk_label_set_markup (GTK_LABEL (priv->description_label), label);
+ 
+       /* align left */
+-      gtk_widget_set_halign (GTK_WIDGET (priv->description_label), GTK_ALIGN_START);
++      gtk_misc_set_alignment (GTK_MISC (priv->description_label), 0, 0);
+     }
+ 
+     update_packing (menuitem);
+@@ -525,7 +540,7 @@ scale_menu_item_set_percentage_label (ScaleMenuItem *menuitem,
+       /* create label */
+       priv->percentage_label = gtk_label_new (label);
+       /* align left */
+-      gtk_widget_set_halign (GTK_WIDGET (priv->percentage_label), GTK_ALIGN_START);
++      gtk_misc_set_alignment (GTK_MISC (priv->percentage_label), 0, 0);
+     }
+ 
+     update_packing (menuitem);
+diff --git a/panel-plugins/power-manager-plugin/xfce/power-manager-plugin.desktop.in.in b/panel-plugins/power-manager-plugin/xfce/power-manager-plugin.desktop.in.in
+index c3edc354..71c0553f 100644
+--- a/panel-plugins/power-manager-plugin/xfce/power-manager-plugin.desktop.in.in
++++ b/panel-plugins/power-manager-plugin/xfce/power-manager-plugin.desktop.in.in
+@@ -6,4 +6,4 @@ Icon=battery-full-charging
+ X-XFCE-Module=xfce4powermanager
+ X-XFCE-Unique=TRUE
+ X-XFCE-Internal=false
+-X-XFCE-API=2.0
+\ No newline at end of file
++X-XFCE-API=1.0
+diff --git a/panel-plugins/power-manager-plugin/xfce/xfce-power-manager-plugin.c b/panel-plugins/power-manager-plugin/xfce/xfce-power-manager-plugin.c
+index 7aea8c5d..37b466ae 100644
+--- a/panel-plugins/power-manager-plugin/xfce/xfce-power-manager-plugin.c
++++ b/panel-plugins/power-manager-plugin/xfce/xfce-power-manager-plugin.c
+@@ -140,7 +140,7 @@ power_manager_plugin_configure (XfcePanelPlugin      *plugin,
+                                 PowerManagerPlugin   *power_manager_plugin)
+ {
+   GtkWidget *dialog;
+-  GtkWidget *grid, *combo, *label;
++  GtkWidget *alignment, *table, *combo, *label;
+   gint show_panel_label;
+   XfconfChannel   *channel;
+   GtkListStore *list_store;
+@@ -166,21 +166,21 @@ power_manager_plugin_configure (XfcePanelPlugin      *plugin,
+   gtk_window_set_icon_name (GTK_WINDOW (dialog), "xfce4-power-manager-settings");
+   gtk_widget_show (dialog);
+ 
+-  /* Set up the main grid for all settings */
+-  grid = gtk_grid_new ();
+-  gtk_grid_set_row_spacing (GTK_GRID (grid), 6);
+-  gtk_grid_set_column_spacing (GTK_GRID (grid), 12);
+-  gtk_widget_set_margin_start (grid, 12);
+-  gtk_widget_set_margin_end (grid, 12);
+-  gtk_widget_set_margin_top (grid, 12);
+-  gtk_widget_set_margin_bottom (grid, 12);
++  alignment = gtk_alignment_new (0, 0, 0, 0);
++  gtk_alignment_set_padding (GTK_ALIGNMENT (alignment), 12, 12, 12, 12);
+   gtk_container_add_with_properties (GTK_CONTAINER (gtk_dialog_get_content_area (GTK_DIALOG (dialog))),
+-						                         grid, "expand", TRUE, "fill", TRUE, NULL);
++                                     alignment, "expand", TRUE, "fill", TRUE, NULL);
++
++  /* Set up the main grid for all settings */
++  table = gtk_table_new (0, 2, FALSE);
++  gtk_table_set_row_spacings (GTK_TABLE (table), 6);
++  gtk_table_set_col_spacings (GTK_TABLE (table), 12);
++  gtk_container_add (GTK_CONTAINER (alignment), table);
+ 
+   /* show-panel-label setting */
+   label = gtk_label_new (_("Show label:"));
+-  gtk_label_set_xalign (GTK_LABEL (label), 0.0);
+-  gtk_grid_attach (GTK_GRID (grid), GTK_WIDGET (label), 0, 0, 1, 1);
++  gtk_misc_set_alignment (GTK_MISC (label), 0, 0);
++  gtk_table_attach (GTK_TABLE (table), GTK_WIDGET (label), 0, 1, 0, 1, 0, 0, 0, 0);
+   show_panel_label = xfconf_channel_get_int (channel, XFPM_PROPERTIES_PREFIX SHOW_PANEL_LABEL, -1);
+ 
+   list_store = gtk_list_store_new (N_COLUMNS,
+@@ -200,9 +200,8 @@ power_manager_plugin_configure (XfcePanelPlugin      *plugin,
+   cell = gtk_cell_renderer_text_new ();
+   gtk_cell_layout_pack_start (GTK_CELL_LAYOUT (combo), cell, TRUE );
+   gtk_cell_layout_set_attributes (GTK_CELL_LAYOUT (combo), cell, "text", COLUMN_STRING, NULL);
+-  gtk_combo_box_set_id_column (GTK_COMBO_BOX (combo), COLUMN_STRING);
+   gtk_combo_box_set_active_iter (GTK_COMBO_BOX (combo), &active_iter);
+-  gtk_grid_attach (GTK_GRID (grid), GTK_WIDGET (combo), 1, 0, 1, 1);
++  gtk_table_attach (GTK_TABLE (table), GTK_WIDGET (combo), 1, 2, 0, 1, 0, 0, 0, 0);
+   g_signal_connect (G_OBJECT (combo), "changed",
+                     G_CALLBACK (power_manager_plugin_combo_changed),
+                     channel);
+@@ -216,7 +215,7 @@ power_manager_plugin_configure (XfcePanelPlugin      *plugin,
+ 
+   g_signal_connect (G_OBJECT (dialog), "response",
+                     G_CALLBACK(power_manager_plugin_configure_response), power_manager_plugin);
+-  gtk_widget_show_all (grid);
++  gtk_widget_show_all (alignment);
+ }
+ 
+ 
+diff --git a/settings/Makefile.am b/settings/Makefile.am
+index 8cf3ddc5..7f6b53e0 100644
+--- a/settings/Makefile.am
++++ b/settings/Makefile.am
+@@ -26,8 +26,7 @@ xfce4_power_manager_settings_CFLAGS =				\
+ 	$(GLIB_CFLAGS)						\
+ 	$(GTHREAD_CFLAGS)					\
+ 	$(GMODULE_CFLAGS)					\
+-	$(DBUS_CFLAGS)						\
+-	$(DBUS_GLIB_CFLAGS)					\
++	$(GIO_UNIX_CFLAGS)					\
+ 	$(LIBXFCE4UI_CFLAGS)					\
+ 	$(LIBXFCE4UTIL_CFLAGS)					\
+ 	$(XFCONF_CFLAGS)					\
+@@ -40,8 +39,7 @@ xfce4_power_manager_settings_LDADD   =				\
+ 	$(GLIB_LIBS)						\
+ 	$(GTHREAD_LIBS)						\
+ 	$(GMODULE_LIBS)						\
+-	$(DBUS_LIBS)						\
+-	$(DBUS_GLIB_LIBS)					\
++	$(GIO_UNIX_LIBS)					\
+ 	$(LIBXFCE4UI_LIBS)					\
+ 	$(LIBXFCE4UTIL_LIBS)					\
+ 	$(XFCONF_LIBS)						\
+diff --git a/settings/xfpm-settings-app.c b/settings/xfpm-settings-app.c
+index f1b4fa45..e401a23f 100644
+--- a/settings/xfpm-settings-app.c
++++ b/settings/xfpm-settings-app.c
+@@ -23,7 +23,6 @@
+ #endif
+ 
+ #include <gtk/gtk.h>
+-#include <gtk/gtkx.h>
+ #include <glib.h>
+ #include <gio/gio.h>
+ 
+@@ -43,6 +42,7 @@ struct _XfpmSettingsAppPrivate
+     gboolean          debug;
+     Window            socket_id;
+     gchar            *device_id;
++    GList            *windows;
+ };
+ 
+ static void xfpm_settings_app_launch     (GApplication *app);
+@@ -63,7 +63,7 @@ static void activate_quit                (GSimpleAction  *action,
+                                           GVariant       *parameter,
+                                           gpointer        data);
+ 
+-G_DEFINE_TYPE_WITH_PRIVATE(XfpmSettingsApp, xfpm_settings_app, GTK_TYPE_APPLICATION);
++G_DEFINE_TYPE_WITH_PRIVATE(XfpmSettingsApp, xfpm_settings_app, G_TYPE_APPLICATION);
+ 
+ 
+ 
+@@ -103,6 +103,8 @@ xfpm_settings_app_startup (GApplication *app)
+     /* keep the app running until we've launched our window */
+     g_application_hold (app);
+ 
++    gtk_init (NULL, NULL);
++
+     /* let the parent class do it's startup as well */
+     G_APPLICATION_CLASS(xfpm_settings_app_parent_class)->startup(app);
+ }
+@@ -126,7 +128,6 @@ xfpm_settings_app_launch (GApplication *app)
+     GVariant         *config;
+     GVariantIter     *iter;
+     gchar            *key, *value;
+-    GList            *windows;
+ 
+     gboolean has_battery;
+     gboolean auth_suspend;
+@@ -144,9 +145,7 @@ xfpm_settings_app_launch (GApplication *app)
+ 
+     TRACE ("entering");
+ 
+-    windows = gtk_application_get_windows (GTK_APPLICATION (app));
+-
+-    if (windows != NULL)
++    if (priv->windows != NULL)
+     {
+         XFPM_DEBUG ("window already opened");
+ 
+@@ -258,12 +257,13 @@ xfpm_settings_app_launch (GApplication *app)
+     dialog = xfpm_settings_dialog_new (channel, auth_suspend, auth_hibernate,
+                                        can_suspend, can_hibernate, can_shutdown, has_battery, has_lcd_brightness,
+                                        has_lid, has_sleep_button, has_hibernate_button, has_power_button, has_battery_button,
+-                                       priv->socket_id, priv->device_id, GTK_APPLICATION (app));
++                                       priv->socket_id, priv->device_id, G_APPLICATION (app));
+ 
+     g_hash_table_destroy (hash);
+ 
+-    gtk_application_add_window (GTK_APPLICATION (app), GTK_WINDOW (dialog));
+-    g_application_release (app);
++    priv->windows = g_list_append (priv->windows, GTK_WINDOW (dialog));
++    g_signal_connect_swapped (GTK_WINDOW (dialog), "destroy",
++                              G_CALLBACK (g_application_release), app);
+ 
+     g_object_unref (manager);
+ }
+@@ -330,17 +330,17 @@ activate_quit (GSimpleAction  *action,
+                GVariant       *parameter,
+                gpointer        data)
+ {
+-    GtkApplication *app = GTK_APPLICATION (data);
+-    GList *windows;
++    GApplication *app = G_APPLICATION (data);
++    XfpmSettingsAppPrivate *priv = xfpm_settings_app_get_instance_private (XFPM_SETTINGS_APP (app));
+ 
+     TRACE ("entering");
+ 
+-    windows = gtk_application_get_windows (app);
+-
+-    if (windows)
++    if (priv->windows)
+     {
+         /* Remove our window if we've attahced one */
+-        gtk_application_remove_window (app, GTK_WINDOW (windows->data));
++	GtkWidget *window = GTK_WIDGET (priv->windows->data);
++        priv->windows = g_list_remove (priv->windows, window);
++	gtk_widget_destroy (window);
+     }
+ }
+ 
+diff --git a/settings/xfpm-settings-app.h b/settings/xfpm-settings-app.h
+index b6517d39..0b80cb9f 100644
+--- a/settings/xfpm-settings-app.h
++++ b/settings/xfpm-settings-app.h
+@@ -41,13 +41,13 @@ typedef struct _XfpmSettingsAppPrivate  XfpmSettingsAppPrivate;
+ 
+ struct _XfpmSettingsApp
+ {
+-    GtkApplication               parent;
++    GApplication                 parent;
+     XfpmSettingsAppPrivate      *priv;
+ };
+ 
+ struct _XfpmSettingsAppClass
+ {
+-    GtkApplicationClass    parent_class;
++    GApplicationClass      parent_class;
+ };
+ 
+ 
+diff --git a/settings/xfpm-settings-main.c b/settings/xfpm-settings-main.c
+index 88c71c84..b00857ec 100644
+--- a/settings/xfpm-settings-main.c
++++ b/settings/xfpm-settings-main.c
+@@ -28,7 +28,6 @@
+ #include <string.h>
+ 
+ #include <gtk/gtk.h>
+-#include <gtk/gtkx.h>
+ #include <glib.h>
+ 
+ #include <libxfce4util/libxfce4util.h>
+diff --git a/settings/xfpm-settings.c b/settings/xfpm-settings.c
+index a121f007..df390a91 100644
+--- a/settings/xfpm-settings.c
++++ b/settings/xfpm-settings.c
+@@ -52,7 +52,7 @@
+ 
+ #define BRIGHTNESS_DISABLED 	9
+ 
+-static  GtkApplication *app			= NULL;
++static  GApplication *app			= NULL;
+ static 	GtkBuilder *xml 			= NULL;
+ static  GtkWidget  *nt				= NULL;
+ 
+@@ -147,7 +147,6 @@ void        on_sleep_mode_changed_cb      (GtkWidget *w,
+ 						    XfconfChannel *channel);
+ 
+ void        dpms_toggled_cb                        (GtkWidget *w,
+-                                                    gboolean is_active,
+                                                     XfconfChannel *channel);
+ 
+ void        sleep_on_battery_value_changed_cb      (GtkWidget *w,
+@@ -442,8 +441,10 @@ on_battery_sleep_mode_changed_cb (GtkWidget *w, XfconfChannel *channel)
+ }
+ 
+ void
+-dpms_toggled_cb (GtkWidget *w, gboolean is_active, XfconfChannel *channel)
++dpms_toggled_cb (GtkWidget *w, XfconfChannel *channel)
+ {
++    gboolean is_active = gtk_toggle_button_get_active (GTK_TOGGLE_BUTTON (w));
++
+     xfconf_channel_set_bool (channel, XFPM_PROPERTIES_PREFIX DPMS_ENABLED_CFG, is_active);
+ 
+     gtk_widget_set_sensitive (on_ac_dpms_off, is_active);
+@@ -1327,7 +1328,7 @@ xfpm_settings_general (XfconfChannel *channel, gboolean auth_suspend,
+      * Global dpms settings (enable/disable)
+      */
+     val = xfconf_channel_get_bool (channel, XFPM_PROPERTIES_PREFIX DPMS_ENABLED_CFG, TRUE);
+-    gtk_switch_set_state (GTK_SWITCH (dpms), val);
++    gtk_toggle_button_set_active (GTK_TOGGLE_BUTTON (dpms), val);
+ 
+     /*
+      * Power button
+@@ -2320,7 +2321,7 @@ xfpm_settings_dialog_new (XfconfChannel *channel, gboolean auth_suspend,
+                           gboolean has_lid, gboolean has_sleep_button,
+                           gboolean has_hibernate_button, gboolean has_power_button,
+                           gboolean has_battery_button,  Window id, gchar *device_id,
+-                          GtkApplication *gtk_app)
++                          GApplication *gtk_app)
+ {
+     GtkWidget *plug;
+     GtkWidget *parent;
+@@ -2330,13 +2331,11 @@ xfpm_settings_dialog_new (XfconfChannel *channel, gboolean auth_suspend,
+     GtkWidget *hbox;
+     GtkWidget *frame;
+     GtkWidget *switch_widget;
+-    GtkStyleContext *context;
+     GtkListStore *list_store;
+     GtkTreeViewColumn *col;
+     GtkCellRenderer *renderer;
+     GError *error = NULL;
+     guint val;
+-    GtkCssProvider *css_provider;
+ 
+     XFPM_DEBUG ("auth_hibernate=%s auth_suspend=%s can_shutdown=%s can_suspend=%s can_hibernate=%s " \
+                 "has_battery=%s has_lcd_brightness=%s has_lid=%s has_sleep_button=%s " \
+@@ -2391,16 +2390,6 @@ xfpm_settings_dialog_new (XfconfChannel *channel, gboolean auth_suspend,
+     dialog = GTK_WIDGET (gtk_builder_get_object (xml, "xfpm-settings-dialog"));
+     nt = GTK_WIDGET (gtk_builder_get_object (xml, "main-notebook"));
+ 
+-    /* Set Gtk style */
+-    css_provider = gtk_css_provider_new ();
+-    gtk_css_provider_load_from_data (css_provider,
+-                                     ".xfce4-scale-label { padding-bottom: 0; }",
+-                                     -1, NULL);
+-    gtk_style_context_add_provider_for_screen (gdk_screen_get_default(),
+-                                               GTK_STYLE_PROVIDER(css_provider),
+-                                               GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+-    g_object_unref (css_provider);
+-
+     /* Devices listview */
+     sideview = gtk_tree_view_new ();
+     list_store = gtk_list_store_new (NCOLS_SIDEBAR,
+@@ -2436,9 +2425,7 @@ xfpm_settings_dialog_new (XfconfChannel *channel, gboolean auth_suspend,
+     device_details_notebook = gtk_notebook_new ();
+ 
+     gtk_notebook_set_show_tabs (GTK_NOTEBOOK (device_details_notebook), FALSE);
+-    context = gtk_widget_get_style_context (GTK_WIDGET (device_details_notebook));
+-    gtk_style_context_add_class (context, "frame");
+-    hbox = gtk_box_new (GTK_ORIENTATION_HORIZONTAL, 3);
++    hbox = gtk_hbox_new (FALSE, 3);
+ 
+     viewport = gtk_viewport_new (NULL, NULL);
+     gtk_container_add (GTK_CONTAINER (viewport), sideview);
+diff --git a/settings/xfpm-settings.h b/settings/xfpm-settings.h
+index 15888491..2acd2dd7 100644
+--- a/settings/xfpm-settings.h
++++ b/settings/xfpm-settings.h
+@@ -21,7 +21,7 @@
+ #ifndef __XFPM_SETTINGS_H
+ #define __XFPM_SETTINGS_H
+ 
+-#include <gtk/gtkx.h>
++#include <gdk/gdkx.h>
+ #include <xfconf/xfconf.h>
+ 
+ GtkWidget *xfpm_settings_dialog_new (XfconfChannel *channel,
+@@ -39,7 +39,7 @@ GtkWidget *xfpm_settings_dialog_new (XfconfChannel *channel,
+                                      gboolean has_battery_button,
+                                      Window id,
+                                      gchar *device_id,
+-                                     GtkApplication *gtk_app);
++                                     GApplication *gtk_app);
+ 
+ void     xfpm_settings_show_device_id (gchar *device_id);
+ 
+diff --git a/src/Makefile.am b/src/Makefile.am
+index 9e63f853..c88eb6c9 100644
+--- a/src/Makefile.am
++++ b/src/Makefile.am
+@@ -58,7 +58,7 @@ xfce4_power_manager_CFLAGS =                    \
+ 	-DXFPM_SYSTRAY							\
+ 	$(GOBJECT_CFLAGS)                       \
+ 	$(GTHREAD_CFLAGS)                       \
+-	$(DBUS_GLIB_CFLAGS)                     \
++	$(GIO_UNIX_CFLAGS)                      \
+ 	$(LIBXFCE4UI_CFLAGS)                    \
+ 	$(XFCONF_CFLAGS)                        \
+ 	$(LIBNOTIFY_CFLAGS)                     \
+@@ -77,7 +77,7 @@ xfce4_power_manager_LDADD =                     \
+ 	$(top_builddir)/libdbus/libxfpmdbus.la  \
+ 	$(GOBJECT_LIBS)                         \
+ 	$(GTHREAD_LIBS)                         \
+-	$(DBUS_GLIB_LIBS)                       \
++	$(GIO_UNIX_LIBS)                        \
+ 	$(LIBXFCE4UI_LIBS)                      \
+ 	$(XFCONF_LIBS)                          \
+ 	$(LIBNOTIFY_LIBS)                       \
+diff --git a/src/xfpm-button.c b/src/xfpm-button.c
+index ed72ea8a..9facb860 100644
+--- a/src/xfpm-button.c
++++ b/src/xfpm-button.c
+@@ -125,14 +125,12 @@ static gboolean
+ xfpm_button_grab_keystring (XfpmButton *button, guint keycode)
+ {
+     Display *display;
+-    GdkDisplay *gdisplay;
+     guint ret;
+     guint modmask = AnyModifier;
+ 
+     display = gdk_x11_get_default_xdisplay ();
+-    gdisplay = gdk_display_get_default ();
+ 
+-    gdk_x11_display_error_trap_push (gdisplay);
++    gdk_error_trap_push ();
+ 
+     ret = XGrabKey (display, keycode, modmask,
+ 		    GDK_WINDOW_XID (button->priv->window), True,
+@@ -156,8 +154,8 @@ xfpm_button_grab_keystring (XfpmButton *button, guint keycode)
+ 	return FALSE;
+     }
+ 
+-    gdk_display_flush (gdisplay);
+-    gdk_x11_display_error_trap_pop_ignored (gdisplay);
++    gdk_flush ();
++    gdk_error_trap_pop ();
+     return TRUE;
+ }
+ 

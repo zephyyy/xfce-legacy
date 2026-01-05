@@ -1,0 +1,137 @@
+From 7637df41229e008d784dfc0cc40b09fb9896cd44 Mon Sep 17 00:00:00 2001
+From: Steve Dodier-Lazaro <sidnioulz@gmail.com>
+Date: Thu, 2 Jun 2016 17:37:29 +0100
+Subject: [PATCH 1/2] Popup menus despite X11 device grab race conditions
+
+Signed-off-by: Eric Koegel <eric.koegel@gmail.com>
+---
+ libxfce4ui/libxfce4ui.symbols    |  1 +
+ libxfce4ui/xfce-gtk-extensions.c | 64 ++++++++++++++++++++++++++++++++
+ libxfce4ui/xfce-gtk-extensions.h | 22 +++++++----
+ 3 files changed, 80 insertions(+), 7 deletions(-)
+
+diff --git a/libxfce4ui/libxfce4ui.symbols b/libxfce4ui/libxfce4ui.symbols
+index e054f5f..1a6ea6a 100644
+--- a/libxfce4ui/libxfce4ui.symbols
++++ b/libxfce4ui/libxfce4ui.symbols
+@@ -83,6 +83,7 @@ xfce_gtk_button_new_mixed G_GNUC_MALLOC
+ xfce_gtk_frame_box_new G_GNUC_MALLOC
+ xfce_gtk_frame_box_new_with_content G_GNUC_MALLOC
+ xfce_gtk_window_center_on_active_screen
++xfce_gtk_menu_popup_until_mapped
+ #endif
+ #endif
+ 
+diff --git a/libxfce4ui/xfce-gtk-extensions.c b/libxfce4ui/xfce-gtk-extensions.c
+index 0857dc2..e80a12c 100644
+--- a/libxfce4ui/xfce-gtk-extensions.c
++++ b/libxfce4ui/xfce-gtk-extensions.c
+@@ -200,5 +200,69 @@ xfce_gtk_window_center_on_active_screen (GtkWindow *window)
+ 
+ 
+ 
++/**
++ * xfce_gtk_menu_popup_until_mapped:
++ * @menu: a #GtkMenu.
++ * @parent_menu_shell: the menu shell containing the triggering menu item, or %NULL.
++ * @parent_menu_item: the menu item whose activation triggered the popup, or %NULL.
++ * @func: a user supplied function used to position the menu, or %NULL.
++ * @data: user supplied data to be passed to func.
++ * @button: the mouse button which was pressed to initiate the event.
++ * @activate_time: the time at which the activation event occurred.
++ *
++ * Attempts to pop up a #GtkMenu for a short duration. Unlike the original
++ * gtk_menu_popup(), this function will verify that the menu has been mapped
++ * or will keep trying for up to 250ms. It will also return a value indicating
++ * whether the menu was eventually mapped or not. Following is an excerpt from
++ * the GTK+ Documentation on #GtkMenu.
++ * 
++ * Displays a menu and makes it available for selection.
++ *
++ * Applications can use this function to display context-sensitive menus, and will
++ * typically supply %NULL for the @parent_menu_shell, @parent_menu_item, @func and
++ * @data parameters. The default menu positioning function will position the menu
++ * at the current mouse cursor position.
++ *
++ * The @button parameter should be the mouse button pressed to initiate the menu
++ * popup. If the menu popup was initiated by something other than a mouse button
++ * press, such as a mouse button release or a keypress, button should be 0.
++ *
++ * The @activate_time parameter is used to conflict-resolve initiation of concurrent
++ * requests for mouse/keyboard grab requests. To function properly, this needs to
++ * be the timestamp of the user event (such as a mouse click or key press) that
++ * caused the initiation of the popup. Only if no such event is available,
++ * gtk_get_current_event_time() can be used instead.
++ *
++ * Return value: %TRUE if the menu could be mapped, %FALSE otherwise.
++ */
++gboolean
++xfce_gtk_menu_popup_until_mapped (GtkMenu *menu,
++                                  GtkWidget *parent_menu_shell,
++                                  GtkWidget *parent_menu_item,
++                                  GtkMenuPositionFunc func,
++                                  gpointer data,
++                                  guint button,
++                                  guint32 activate_time)
++{
++  gint i = 0;
++
++  g_return_val_if_fail (GTK_IS_MENU (menu), FALSE);
++
++  while ((i++ < 2500) && (!gtk_widget_get_mapped (GTK_WIDGET (menu))))
++    {
++        gtk_menu_popup (GTK_MENU (menu),
++                        parent_menu_shell,
++                        parent_menu_item,
++                        func,
++                        data,
++                        button,
++                        activate_time);
++
++        g_usleep (100);
++    }
++
++  return gtk_widget_get_mapped (GTK_WIDGET (menu));
++}
++
+ #define __XFCE_GTK_EXTENSIONS_C__
+ #include <libxfce4ui/libxfce4ui-aliasdef.c>
+diff --git a/libxfce4ui/xfce-gtk-extensions.h b/libxfce4ui/xfce-gtk-extensions.h
+index a16cb15..babca0b 100644
+--- a/libxfce4ui/xfce-gtk-extensions.h
++++ b/libxfce4ui/xfce-gtk-extensions.h
+@@ -28,16 +28,24 @@
+ 
+ G_BEGIN_DECLS
+ 
+-GtkWidget *xfce_gtk_button_new_mixed               (const gchar     *stock_id,
+-                                                    const gchar     *label) G_GNUC_MALLOC;
++GtkWidget *xfce_gtk_button_new_mixed               (const gchar        *stock_id,
++                                                    const gchar        *label) G_GNUC_MALLOC;
+ 
+-GtkWidget *xfce_gtk_frame_box_new                  (const gchar     *label,
+-                                                    GtkWidget      **container_return) G_GNUC_MALLOC;
++GtkWidget *xfce_gtk_frame_box_new                  (const gchar        *label,
++                                                    GtkWidget         **container_return) G_GNUC_MALLOC;
+ 
+-GtkWidget *xfce_gtk_frame_box_new_with_content     (const gchar     *label,
+-                                                    GtkWidget       *content) G_GNUC_MALLOC;
++GtkWidget *xfce_gtk_frame_box_new_with_content     (const gchar         *label,
++                                                    GtkWidget           *content) G_GNUC_MALLOC;
+ 
+-void       xfce_gtk_window_center_on_active_screen (GtkWindow       *window);
++void       xfce_gtk_window_center_on_active_screen (GtkWindow           *window);
++
++gboolean   xfce_gtk_menu_popup_until_mapped        (GtkMenu             *menu,
++                                                    GtkWidget           *parent_menu_shell,
++                                                    GtkWidget           *parent_menu_item,
++                                                    GtkMenuPositionFunc  func,
++                                                    gpointer             data,
++                                                    guint                button,
++                                                    guint32              activate_time);
+ 
+ G_END_DECLS
+ 
+-- 
+2.26.2
+

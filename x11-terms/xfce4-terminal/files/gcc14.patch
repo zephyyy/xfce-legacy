@@ -1,0 +1,18 @@
+--- a/terminal/terminal-image-loader.c
++++ b/terminal/terminal-image-loader.c
+@@ -497,13 +497,13 @@
+       if (gdk_pixbuf_get_height (pixbuf) == height
+           && gdk_pixbuf_get_width (pixbuf) == width)
+         {
+-          return g_object_ref (G_OBJECT (pixbuf));
++          return g_object_ref (pixbuf);
+         }
+       else if (gdk_pixbuf_get_height (pixbuf) >= height
+             && gdk_pixbuf_get_width (pixbuf) >= width
+             && loader->style == TERMINAL_BACKGROUND_STYLE_TILED)
+         {
+-          return g_object_ref (G_OBJECT (pixbuf));
++          return g_object_ref (pixbuf);
+         }
+     }
+ 

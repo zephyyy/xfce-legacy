@@ -1,0 +1,48 @@
+diff --git a/Makefile.am b/Makefile.am
+index bb527173..bf7a88e4 100644
+--- a/Makefile.am
++++ b/Makefile.am
+@@ -895,7 +895,7 @@ desktop_DATA = $(desktop_in_files:.desktop.in=.desktop)
+ gsettings_SCHEMAS = org.gnome.nm-applet.gschema.xml
+ @GSETTINGS_RULES@
+ 
+-appdatadir = $(datadir)/appdata
++appdatadir = $(datadir)/metainfo
+ appdata_DATA = $(appdata_in_files:.xml.in=.xml)
+ appdata_in_files = nm-connection-editor.appdata.xml.in
+ @INTLTOOL_XML_RULE@
+diff --git a/configure.ac b/configure.ac
+index eb6bc214..27e4d202 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -130,9 +130,9 @@ PKG_CHECK_MODULES(GTK, gtk+-2.0 >= 2.24)
+ GTK_CFLAGS="$GTK_CFLAGS"
+ 
+ AC_ARG_WITH([appindicator], AS_HELP_STRING([--with-appindicator|--without-appindicator], [Build with libappindicator support instead of xembed systray support.]))
+-if test "$with_appindicator" == "yes"; then
+-	PKG_CHECK_MODULES(APPINDICATOR, appindicator3-0.1)
+-	PKG_CHECK_MODULES(DBUSMENU, dbusmenu-gtk3-0.4 >= 16.04.0)
++if test "$with_appindicator" = "yes"; then
++	PKG_CHECK_MODULES(APPINDICATOR, appindicator-0.1)
++	PKG_CHECK_MODULES(DBUSMENU, dbusmenu-gtk-0.4 >= 16.04.0)
+ 	AC_DEFINE([WITH_APPINDICATOR], 1, [Enable using libappindicator])
+ fi
+ 
+@@ -140,7 +140,7 @@ AM_CONDITIONAL(HAVE_GBT, test x"$have_gbt" = "xyes")
+ 
+ dnl ModemManager1 with libmm-glib for WWAN support
+ AC_ARG_WITH(wwan, AS_HELP_STRING([--with-wwan], [Enable WWAN support (default: yes)]))
+-if (test "${with_wwan}" == "no"); then
++if (test "${with_wwan}" = "no"); then
+     AC_DEFINE(WITH_WWAN, 0, [Define if you have ModemManager/WWAN support])
+ else
+     PKG_CHECK_MODULES(MM_GLIB,
+@@ -155,7 +155,7 @@ PKG_CHECK_MODULES(GUDEV, gudev-1.0 >= 147)
+ 
+ dnl Jansson for team configuration editing
+ AC_ARG_WITH(team, AS_HELP_STRING([--with-team], [Enable team configuration editor (default: yes)]))
+-if (test "${with_team}" == "no"); then
++if (test "${with_team}" = "no"); then
+     AC_DEFINE(WITH_JANSSON, 0, [Define if Jansson is available])
+ else
+     PKG_CHECK_MODULES(JANSSON,

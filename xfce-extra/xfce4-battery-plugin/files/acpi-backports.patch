@@ -1,0 +1,1826 @@
+From ae36fc8b03183ae05cfad634583cc05f091e400f Mon Sep 17 00:00:00 2001
+From: John Lindgren <john@jlindgren.net>
+Date: Fri, 30 Nov 2018 21:35:48 -0500
+Subject: [PATCH] Remove historical APM support for Linux, support ACPI only.
+
+---
+ panel-plugin/Makefile.am |   4 +-
+ panel-plugin/battery.c   |  43 +---
+ panel-plugin/libapm.c    | 471 ---------------------------------------
+ panel-plugin/libapm.h    |  72 ------
+ 4 files changed, 6 insertions(+), 584 deletions(-)
+ delete mode 100644 panel-plugin/libapm.c
+ delete mode 100644 panel-plugin/libapm.h
+
+diff --git a/panel-plugin/Makefile.am b/panel-plugin/Makefile.am
+index 44a6263..d2d991e 100644
+--- a/panel-plugin/Makefile.am
++++ b/panel-plugin/Makefile.am
+@@ -14,9 +14,7 @@ plugin_LTLIBRARIES = libbattery.la
+ libbattery_la_SOURCES =							\
+ 	battery.c							\
+ 	libacpi.h							\
+-	libacpi.c							\
+-	libapm.h							\
+-	libapm.c
++	libacpi.c
+ 
+ libbattery_la_CFLAGS =							\
+ 	$(LIBXFCE4PANEL_CFLAGS)						\
+diff --git a/panel-plugin/battery.c b/panel-plugin/battery.c
+index b081bbd..cf389c1 100644
+--- a/panel-plugin/battery.c
++++ b/panel-plugin/battery.c
+@@ -33,8 +33,6 @@
+ #include <sys/ioctl.h>
+ #include <machine/apmvar.h>
+ #define APMDEVICE "/dev/apm"
+-#elif __linux__
+-#include <libapm.h>
+ #endif
+ 
+ #include <sys/stat.h>
+@@ -226,36 +224,16 @@ detect_battery_info(t_battmon *battmon)
+       battmon->method = BM_USE_APM;
+ 
+       return TRUE;
+-#elif __linux__
+-    struct apm_info apm;
+-
+-    /* First check to see if ACPI is available */
++#else
++    /* Check to see if ACPI is available */
+     if(check_acpi()==0) {
+         /* ACPI detected */
+-        int i;
+         battmon->method = BM_USE_ACPI;
+-        for (i=0;i<batt_count;i++) {
+-            if (read_acpi_info(i)) break;
+-        }
+-        /*read_acpi_info(0);*/ /* only consider first battery... */
+-        for (i=0;i<batt_count;i++) {
+-            if (read_acpi_state(i)) break;
+-        }
+-        if (batt_count){
+-           apm.battery_percentage=acpistate->percentage;
+-           apm.battery_time=acpistate->rtime;
+-        }
+-    return TRUE;
+-    }
+-    if(apm_read(&apm) == 0) {
+-        /* ACPI not detected, but APM works */
+-        battmon->method = BM_USE_APM;
+         return TRUE;
+     }
+ 
+-    /* Neither ACPI or APM detected/working */
++    /* ACPI not detected/working */
+     battmon->method = BM_BROKEN;
+-
+     return FALSE;
+ #endif
+ }
+@@ -306,9 +284,6 @@ update_apm_status(t_battmon *battmon)
+       battmon->method = BM_USE_APM;
+ 
+ #else
+-#if defined(__linux__) || defined(APMDEVICE)
+-    struct apm_info apm;
+-#endif
+     DBG ("Updating battery status...");
+ 
+     if(battmon->method == BM_BROKEN) {
+@@ -393,16 +368,7 @@ update_apm_status(t_battmon *battmon)
+         last_acline = acline;
+ 
+     }
+-#ifdef __linux__
+-    else {
+-        DBG ("Trying apm_read()...");
+-        apm_read(&apm);    /* not broken and not using ACPI, assume APM */
+-        charge = apm.battery_percentage;
+-        time_remaining = apm.battery_time;
+-        acline = apm.ac_line_status ? TRUE : FALSE;
+-
+-    }
+-#elif __FreeBSD__
++#ifdef __FreeBSD__
+     else {
+  /* This is how I read the information from the APM subsystem under
+      FreeBSD.  Each time this functions is called (once every second)
+@@ -418,6 +384,7 @@ battmon.c:241: for each function it appears in.)
+   */
+ #ifdef APMDEVICE
+        int fd;
++       struct apm_info apm;
+ 
+        battmon->method = BM_BROKEN;
+        fd = open(APMDEVICE, O_RDONLY);
+diff --git a/panel-plugin/libapm.c b/panel-plugin/libapm.c
+deleted file mode 100644
+index 95fa170..0000000
+--- a/panel-plugin/libapm.c
++++ /dev/null
+@@ -1,471 +0,0 @@
+-/* Copyright (c) 1996, 1997 Rickard E. Faith <faith@acm.org>
+- *
+- * This library is free software; you can redistribute it and/or modify it
+- * under the terms of the GNU Library General Public License as published
+- * by the Free Software Foundation; either version 2 of the License, or (at
+- * your option) any later version.
+- *
+- * This library is distributed in the hope that it will be useful, but
+- * WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+- * Library General Public License for more details.
+- *
+- * You should have received a copy of the GNU Library General Public
+- * License along with this library; if not, write to the Free Software
+- * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+- */
+-
+-#include <stdio.h>
+-#include <stdlib.h>
+-#include <unistd.h>
+-#include <string.h>
+-#include <fcntl.h>
+-#include <ctype.h>
+-#include <sys/stat.h>
+-#include <sys/time.h>
+-#include <sys/ioctl.h>
+-#include <sys/types.h>
+-
+-#ifndef __linux__
+-/* FIXME: enable BSD apm calls here */
+-int apm_exists(void)
+-{
+-     return 0;
+-}
+-#else
+-#include <sys/sysmacros.h>
+-#include "libapm.h"
+-
+-#define BACKWARD_COMPAT 1
+-
+-/* If APM support of the right version exists in kernel, return zero.
+- * Otherwise, return 1 if no support exists, or 2 if it is the wrong
+- * version.  *NOTE* The sense of the return value is not intuitive.
+- */
+-int apm_exists(void)
+-{
+-    apm_info i;
+-
+-    if (access(APM_PROC, R_OK))
+-	return 1;
+-    return apm_read(&i);
+-}
+-
+-
+-/* Read information from /proc/apm.  Return 0 on success, 1 if APM not
+- * installed, 2 if APM installed, but old version.
+- */
+-int apm_read(apm_info * i)
+-{
+-    FILE *str;
+-    char units[10];
+-    char buffer[100];
+-    int retcode = 0;
+-
+-    if (!(str = fopen(APM_PROC, "r")))
+-	return 1;
+-    fgets(buffer, sizeof(buffer) - 1, str);
+-    buffer[sizeof(buffer) - 1] = '\0';
+-
+-    /* Should check for other driver versions; driver 1.9 (and some
+-     * others) uses this format, which doesn't expose # batteries.
+-     */
+-    sscanf(buffer, "%s %d.%d %x %x %x %x %d%% %d %s\n",
+-	   (char *) i->driver_version,
+-	   &i->apm_version_major,
+-	   &i->apm_version_minor,
+-	   &i->apm_flags,
+-	   &i->ac_line_status,
+-	   &i->battery_status,
+-	   &i->battery_flags,
+-	   &i->battery_percentage,
+-	   &i->battery_time,
+-	   units);
+-    i->using_minutes = !strncmp(units, "min", 3) ? 1 : 0;
+-    if (i->driver_version[0] == 'B')
+-    {				/* old style.  argh. */
+-#if !BACKWARD_COMPAT
+-	retcode = 2;
+-#else
+-	strcpy((char *) i->driver_version, "pre-0.7");
+-	i->apm_version_major = 0;
+-	i->apm_version_minor = 0;
+-	i->apm_flags = 0;
+-	i->ac_line_status = 0xff;
+-	i->battery_status = 0xff;
+-	i->battery_flags = 0xff;
+-	i->battery_percentage = -1;
+-	i->battery_time = -1;
+-	i->using_minutes = 1;
+-
+-	sscanf(buffer, "BIOS version: %d.%d",
+-	       &i->apm_version_major, &i->apm_version_minor);
+-	fgets(buffer, sizeof(buffer) - 1, str);
+-	sscanf(buffer, "Flags: 0x%02x", &i->apm_flags);
+-	if (i->apm_flags & APM_32_BIT_SUPPORT)
+-	{
+-	    fgets(buffer, sizeof(buffer) - 1, str);
+-	    fgets(buffer, sizeof(buffer) - 1, str);
+-	    if (buffer[0] != 'P')
+-	    {
+-		if (!strncmp(buffer + 4, "off line", 8))
+-		    i->ac_line_status = 0;
+-		else if (!strncmp(buffer + 4, "on line", 7))
+-		    i->ac_line_status = 1;
+-		else if (!strncmp(buffer + 4, "on back", 7))
+-		    i->ac_line_status = 2;
+-
+-		fgets(buffer, sizeof(buffer) - 1, str);
+-		if (!strncmp(buffer + 16, "high", 4))
+-		    i->battery_status = 0;
+-		else if (!strncmp(buffer + 16, "low", 3))
+-		    i->battery_status = 1;
+-		else if (!strncmp(buffer + 16, "crit", 4))
+-		    i->battery_status = 2;
+-		else if (!strncmp(buffer + 16, "charg", 5))
+-		    i->battery_status = 3;
+-
+-		fgets(buffer, sizeof(buffer) - 1, str);
+-		if (strncmp(buffer + 14, "unknown", 7))
+-		    i->battery_percentage = atoi(buffer + 14);
+-		if (i->apm_version_major >= 1 && i->apm_version_minor >= 1)
+-		{
+-		    fgets(buffer, sizeof(buffer) - 1, str);
+-		    sscanf(buffer, "Battery flag: 0x%02x", &i->battery_flags);
+-
+-		    fgets(buffer, sizeof(buffer) - 1, str);
+-		    if (strncmp(buffer + 14, "unknown", 7))
+-			i->battery_time = atoi(buffer + 14);
+-		}
+-	    }
+-	}
+-#endif
+-    }
+-
+-    /* Fix possible kernel bug -- percentage
+-     * set to 0xff (==255) instead of -1.
+-     */
+-    if (i->battery_percentage > 100)
+-	i->battery_percentage = -1;
+-
+-    fclose(str);
+-    return retcode;
+-}
+-
+-
+-/* Lookup the device number for the apm_bios device. */
+-dev_t apm_dev(void)
+-{
+-    FILE *str;
+-    static int cached = -1;
+-    char buf[80];
+-    char *pt;
+-    apm_info i;
+-
+-    if (cached >= 0)
+-	return cached;
+-
+-    if (access(APM_PROC, R_OK) || apm_read(&i) == 1)
+-	return cached = -1;
+-    if (i.driver_version[0] == '1')
+-	return cached = makedev(10, 134);
+-
+-    if (!(str = fopen(APM_DEV, "r")))
+-	return -1;
+-    while (fgets(buf, sizeof(buf) - 1, str))
+-    {
+-	buf[sizeof(buf) - 1] = '\0';
+-	for (pt = buf; *pt && isspace(*pt); ++pt);	/* skip leading spaces */
+-	for (; *pt && !isspace(*pt); ++pt);	/* find next space */
+-	if (isspace(*pt))
+-	{
+-	    *pt++ = '\0';
+-	    pt[strlen(pt) - 1] = '\0';	/* get rid of newline */
+-	    if (!strcmp(pt, APM_NAME))
+-	    {
+-		fclose(str);
+-		return cached = makedev(atoi(buf), 0);
+-	    }
+-	}
+-    }
+-    fclose(str);
+-    return cached = -1;
+-}
+-
+-
+-/* Return a file descriptor for the apm_bios device, or -1 if there is an
+- * error.  Is this method secure?  Should we make the device in /dev
+- * instead of /tmp?
+- *
+- * apenwarr 2001/05/11: just throw out the weird temporary device file stuff.
+- *	It was only for ancient kernel versions anyway.
+- */
+-int apm_open(void)
+-{
+-    int fd;
+-    apm_info i;
+-
+-    if (access(APM_PROC, R_OK) || apm_read(&i) == 1)
+-	return -1;
+-    if (i.driver_version[0] >= '1')
+-    {
+-	if ((fd = open(APM_DEVICE, O_RDWR)) < 0)
+-	{
+-	    /* Try to create it.  This is reasonable
+-	     * for backward compatibility.
+-	     */
+-	    if (mknod(APM_DEVICE, S_IFCHR | S_IRUSR | S_IWUSR, apm_dev()))
+-	    {
+-		unlink(APM_DEVICE);
+-		return -1;
+-	    }
+-	    fd = open(APM_DEVICE, O_RDWR);
+-	}
+-
+-	return fd;
+-    }
+-
+-    return -1;
+-}
+-
+-
+-/* Given a file descriptor for the apm_bios device, close it. */
+-int apm_close(int fd)
+-{
+-    return close(fd);
+-}
+-
+-/* Given a file descriptor for the apm_bios device, this routine will wait
+- * timeout seconds for APM events.  Up to n events will be placed in the
+- * events queue.  The return code will indicate the number of events
+- * stored.  Since this routine uses select(2), it will return if an
+- * unblocked signal is caught.  A timeout < 0 means to block indefinately.
+- *
+- * Note that if you read a request to standby or to suspend, the kernel
+- * will be waiting for you to respond to it with a call to apm_suspend()
+- * or to apm_standby() !
+- */
+-int apm_get_events(int fd, int timeout, apm_event_t * events, int n)
+-{
+-    int retcode;
+-    fd_set fds;
+-    struct timeval t;
+-
+-    t.tv_sec = timeout;
+-    t.tv_usec = 0;
+-
+-    FD_ZERO(&fds);
+-    FD_SET(fd, &fds);
+-    retcode = select(fd + 1, &fds, NULL, NULL, timeout < 0 ? NULL : &t);
+-    if (retcode <= 0)
+-	return 0;
+-    return read(fd, events, n * sizeof(apm_event_t)) / sizeof(apm_event_t);
+-}
+-
+-
+-/* Try to set the Power State to Suspend. */
+-int apm_suspend(int fd)
+-{
+-    sync();
+-    return ioctl(fd, APM_IOC_SUSPEND, NULL);
+-}
+-
+-
+-/* Try to set the Power State to Standby. */
+-int apm_standby(int fd)
+-{
+-    sync();
+-    return ioctl(fd, APM_IOC_STANDBY, NULL);
+-}
+-
+-/* Return the last error code generated by the kernel APM driver */
+-unsigned int apm_last_error( int fd )
+-{
+-    int err = 0;
+-
+-#ifdef APM_IOC_LAST_ERROR
+-    int ierr = 0;
+-    if ( (ierr = ioctl( fd, APM_IOC_LAST_ERROR, &err)) )
+-	return ierr;
+-#endif
+-    return err;
+-}
+-
+-/* Define lookup table for error messages */
+-typedef struct lookup_t {
+-	int	key;
+-	char *	msg;
+-} lookup_t;
+-
+-/* APM error messages, arranged by error code */
+-static const lookup_t error_table[] = {
+-/* N/A	{ APM_SUCCESS,		"Operation succeeded" }, */
+-	{ APM_DISABLED,		"Power management disabled" },
+-	{ APM_CONNECTED,	"Real mode interface already connected" },
+-	{ APM_NOT_CONNECTED,	"Interface not connected" },
+-	{ APM_16_CONNECTED,	"16 bit interface already connected" },
+-/* N/A	{ APM_16_UNSUPPORTED,	"16 bit interface not supported" }, */
+-	{ APM_32_CONNECTED,	"32 bit interface already connected" },
+-	{ APM_32_UNSUPPORTED,	"32 bit interface not supported" },
+-	{ APM_BAD_DEVICE,	"Unrecognized device ID" },
+-	{ APM_BAD_PARAM,	"Parameter out of range" },
+-	{ APM_NOT_ENGAGED,	"Interface not engaged" },
+-#ifdef APM_BAD_FUNCTION
+-	{ APM_BAD_FUNCTION,     "Function not supported" },
+-#endif
+-#ifdef APM_RESUME_DISABLED
+-	{ APM_RESUME_DISABLED,	"Resume timer disabled" },
+-#endif
+-	{ APM_BAD_STATE,	"Unable to enter requested state" },
+-/* N/A	{ APM_NO_EVENTS,	"No events pending" }, */
+-	{ APM_NOT_PRESENT,	"No APM present" }
+-};
+-#define ERROR_COUNT	(sizeof(error_table)/sizeof(lookup_t))
+-
+-/* Return character string describing error messages from APM kernel */
+-const char *apm_error_name( unsigned int err )
+-{
+-  int i;
+-
+-  for(i=0; i<ERROR_COUNT; i++)
+-    if(err == error_table[i].key) return(error_table[i].msg);
+-
+-  return "Unknown error";
+-}
+-
+-int apm_reject( int fd )
+-{
+-#ifdef APM_IOC_REJECT
+-    if ( ioctl( fd, APM_IOC_REJECT, NULL ) )
+-	return apm_last_error( fd );
+-    else
+-#endif
+-	return 0;
+-}
+-
+-#ifdef APM_IOC_IGNORE		/* detect kernel support of IGNORE/NOIGNORE functions */
+-int apm_set_ignore(int fd, int mode)
+-/* Ignore Standby. */
+-{
+-    if (mode == IGNORE)
+-    {
+-	printf("Telling kernel to ignore system standby/suspend mode\n");
+-	return ioctl(fd, APM_IOC_IGNORE, NULL);
+-    }
+-    else
+-    {
+-	printf("Telling kernel not to ignore system standby/suspend mode\n");
+-	return ioctl(fd, APM_IOC_NOIGNORE, NULL);
+-    }
+-    printf("NOTE: User-generated suspend/standby requests are not ignored\n");
+-}
+-#endif
+-
+-/* Return a string describing the event. From p. 16 of the Intel/Microsoft
+- * Advanded Power Management (APM) BIOS Interface Specification, Revision
+- * 1.1 (September 1993). Intel Order Number: 241704-001.  Microsoft Part
+- * Number: 781-110-X01.
+- *
+- * Updated to APM BIOS 1.2 spec (February 1996).  Available on-line.
+- */
+-const char *apm_event_name(apm_event_t event)
+-{
+-    switch (event)
+-    {
+-    case APM_SYS_STANDBY:
+-	return "System Standby Request";
+-    case APM_SYS_SUSPEND:
+-	return "System Suspend Request";
+-    case APM_NORMAL_RESUME:
+-	return "Normal Resume System";
+-    case APM_CRITICAL_RESUME:
+-	return "Critical Resume System";
+-    case APM_LOW_BATTERY:
+-	return "Battery Low";
+-    case APM_POWER_STATUS_CHANGE:
+-	return "Power Status Change";
+-    case APM_UPDATE_TIME:
+-	return "Update Time";
+-    case APM_CRITICAL_SUSPEND:
+-	return "Critical Suspend";
+-    case APM_USER_STANDBY:
+-	return "User System Standby Request";
+-    case APM_USER_SUSPEND:
+-	return "User System Suspend Request";
+-    case APM_STANDBY_RESUME:
+-	return "System Standby Resume";
+-#ifdef APM_CAPABILITY_CHANGE
+-    case APM_CAPABILITY_CHANGE:
+-	return "Capability Change";
+-#endif
+-    }
+-    return "Unknown";
+-}
+-
+-
+-/* This is a convenience function that has nothing to do with APM.  It just
+- * formats a time nicely.  If you don't like this format, then write your
+- * own.
+- */
+-#define SEC_PER_DAY  (60*60*24)
+-#define SEC_PER_HOUR (60*60)
+-#define SEC_PER_MIN  (60)
+-
+-const char *apm_delta_time(time_t then, time_t now)
+-{
+-    return apm_time(now - then);
+-}
+-
+-const char *apm_time(time_t t)
+-{
+-    static char buffer[128];
+-    unsigned long s, m, h, d;
+-
+-    d = t / SEC_PER_DAY;
+-    t -= d * SEC_PER_DAY;
+-    h = t / SEC_PER_HOUR;
+-    t -= h * SEC_PER_HOUR;
+-    m = t / SEC_PER_MIN;
+-    t -= m * SEC_PER_MIN;
+-    s = t;
+-
+-    if (d)
+-	sprintf(buffer, "%lu day%s, %02lu:%02lu:%02lu",
+-		d, d > 1 ? "s" : "", h, m, s);
+-    else
+-	sprintf(buffer, "%02lu:%02lu:%02lu", h, m, s);
+-
+-    if (t == -1)
+-	sprintf(buffer, "unknown");
+-
+-    return buffer;
+-}
+-
+-const char *apm_time_nosec(time_t t)
+-{
+-    static char buffer[128];
+-    unsigned long s, m, h, d;
+-
+-    d = t / SEC_PER_DAY;
+-    t -= d * SEC_PER_DAY;
+-    h = t / SEC_PER_HOUR;
+-    t -= h * SEC_PER_HOUR;
+-    m = t / SEC_PER_MIN;
+-    t -= m * SEC_PER_MIN;
+-    s = t;
+-
+-    if (s > 30)
+-	++m;
+-
+-    if (d)
+-	sprintf(buffer, "%lu day%s, %lu:%02lu",
+-		d, d > 1 ? "s" : "", h, m);
+-    else
+-	sprintf(buffer, "%lu:%02lu", h, m);
+-
+-    if (t == -1)
+-	sprintf(buffer, "unknown");
+-
+-    return buffer;
+-}
+-#endif
+diff --git a/panel-plugin/libapm.h b/panel-plugin/libapm.h
+deleted file mode 100644
+index b9b7054..0000000
+--- a/panel-plugin/libapm.h
++++ /dev/null
+@@ -1,72 +0,0 @@
+-/* Copyright (c) 1996, 1997 Rickard E. Faith <faith@acm.org>
+- *
+- * This library is free software; you can redistribute it and/or modify it
+- * under the terms of the GNU Library General Public License as published
+- * by the Free Software Foundation; either version 2 of the License, or (at
+- * your option) any later version.
+- *
+- * This library is distributed in the hope that it will be useful, but
+- * WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+- * Library General Public License for more details.
+- *
+- * You should have received a copy of the GNU Library General Public
+- * License along with this library; if not, write to the Free Software
+- * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+- */
+-
+-#include <sys/types.h>
+-#include <linux/apm_bios.h>
+-
+-#define APM_PROC   "/proc/apm"
+-#define APM_DEVICE "/dev/apm_bios"
+-
+-#define APM_DEV  "/proc/devices"
+-#define APM_NAME "apm_bios"
+-
+-#ifndef APM_32_BIT_SUPPORT
+-#define APM_32_BIT_SUPPORT      0x0002
+-#endif
+-
+-typedef struct apm_info
+-{
+-    const char driver_version[10];
+-    int apm_version_major;
+-    int apm_version_minor;
+-    int apm_flags;
+-    int ac_line_status;
+-    int battery_status;
+-    int battery_flags;
+-    int battery_percentage;
+-    int battery_time;
+-    int using_minutes;
+-}
+-apm_info;
+-
+-extern int apm_exists(void);
+-extern int apm_read(apm_info * i);
+-extern dev_t apm_dev(void);
+-extern int apm_open(void);
+-extern int apm_close(int fd);
+-extern int apm_get_events(int fd, int timeout, apm_event_t * events, int n);
+-extern int apm_suspend(int fd);
+-extern int apm_standby(int fd);
+-extern int apm_set_ignore(int fd, int mode);
+-extern unsigned int apm_last_error(int fd);
+-extern const char *apm_error_name( unsigned int err );
+-extern int apm_reject(int fd);
+-extern const char *apm_event_name(apm_event_t event);
+-extern const char *apm_time(time_t t);
+-extern const char *apm_delta_time(time_t then, time_t now);
+-extern const char *apm_time_nosec(time_t t);
+-
+-#define SUSPEND 0
+-#define STANDBY 1
+-#define IGNORE 2
+-#define NOIGNORE 3
+-
+-/* Linux Kernel APM drivers version 1.10 and higher permit suspend
+-   rejections. */
+-#ifdef APM_IOC_REJECT
+-#define APM_REJECT_ENABLED
+-#endif
+From 86dd9360281223b6d21a4a06963a66b4dd640add Mon Sep 17 00:00:00 2001
+From: John Lindgren <john@jlindgren.net>
+Date: Fri, 30 Nov 2018 22:15:35 -0500
+Subject: [PATCH] Remove APM support on FreeBSD as well, it doesn't even build.
+
+---
+ panel-plugin/battery.c | 92 +-----------------------------------------
+ 1 file changed, 2 insertions(+), 90 deletions(-)
+
+diff --git a/panel-plugin/battery.c b/panel-plugin/battery.c
+index cf389c1..aa63df6 100644
+--- a/panel-plugin/battery.c
++++ b/panel-plugin/battery.c
+@@ -26,9 +26,7 @@
+ #include <config.h>
+ #endif
+ 
+-#if (defined(__FreeBSD__) || defined(__FreeBSD_kernel__)) && (defined(i386) || defined(__i386__))
+-#include <machine/apm_bios.h>
+-#elif (defined(__OpenBSD__) || defined(__NetBSD__))
++#if (defined(__OpenBSD__) || defined(__NetBSD__))
+ #include <sys/param.h>
+ #include <sys/ioctl.h>
+ #include <machine/apmvar.h>
+@@ -160,52 +158,7 @@ init_options(t_battmon_options *options)
+ gboolean
+ detect_battery_info(t_battmon *battmon)
+ {
+-#ifdef __FreeBSD__
+-  /* This is how I read the information from the APM subsystem under
+-     FreeBSD.  Each time this functions is called (once every second)
+-     the APM device is opened, read from and then closed.
+-
+-     except that is does not work on FreeBSD
+-
+-  */
+-#ifdef APMDEVICE
+-    struct apm_info apm;
+-#endif
+-      int fd;
+-
+-    /* First check to see if ACPI is available */
+-    if (check_acpi() == 0) {
+-        int i;
+-        /* ACPI detected */
+-        battmon->method = BM_USE_ACPI;
+-        /* consider battery 0 first... */
+-        for (i=0;i<batt_count;i++) {
+-            if (read_acpi_info(i)) break;
+-        }
+-        for (i=0;i<batt_count;i++) {
+-            if (read_acpi_state(i)) break;
+-        }
+-        /*read_acpi_state(0);*/ /* only consider first battery... */
+-
+-    DBG ("using ACPI");
+-
+-        return TRUE;
+-    }
+-
+-    battmon->method = BM_BROKEN;
+-#ifdef APMDEVICE
+-      fd = open(APMDEVICE, O_RDONLY);
+-      if (fd == -1) return FALSE;
+-
+-      if (ioctl(fd, APMIO_GETINFO, &apm) == -1) {
+-        close(fd);
+-              return FALSE;
+-      }
+-      close(fd);
+-      battmon->method = BM_USE_APM;
+-#endif
+-      return TRUE;
+-#elif defined(__OpenBSD__) || defined(__NetBSD__)
++#if defined(__OpenBSD__) || defined(__NetBSD__)
+   /* Code for OpenBSD by Joe Ammond <jra@twinight.org>. Using the same
+      procedure as for FreeBSD.
+      Made to work on NetBSD by Stefan Sperling <stsp@stsp.in-berlin.de>
+@@ -368,47 +321,6 @@ update_apm_status(t_battmon *battmon)
+         last_acline = acline;
+ 
+     }
+-#ifdef __FreeBSD__
+-    else {
+- /* This is how I read the information from the APM subsystem under
+-     FreeBSD.  Each time this functions is called (once every second)
+-     the APM device is opened, read from and then closed.
+-
+-     except it don't work with 5.x:
+-battmon.c: In function `update_apm_status':
+-battmon.c:241: `APMDEVICE' undeclared (first use in this function)
+-battmon.c:241: (Each undeclared identifier is reported only once
+-battmon.c:241: for each function it appears in.)
+-*** Error code 1
+-
+-  */
+-#ifdef APMDEVICE
+-       int fd;
+-       struct apm_info apm;
+-
+-       battmon->method = BM_BROKEN;
+-       fd = open(APMDEVICE, O_RDONLY);
+-       if (fd == -1) return TRUE;
+-
+-       if (ioctl(fd, APMIO_GETINFO, &apm) == -1) {
+-        close(fd);
+-        return TRUE;
+-     }
+-
+-       close(fd);
+-
+-       acline = apm.ai_acline ? TRUE : FALSE;
+-       time_remaining = apm.ai_batt_time;
+-     time_remaining = time_remaining / 60; /* convert from seconds to minutes */
+-       charge = apm.ai_batt_life;
+-#else
+-     /* FIXME: apm stuff needs fix for 5.x kernels */
+-     acline=0;
+-     time_remaining=0;
+-     charge=0;
+-#endif
+-    }
+-#endif
+ #endif
+     battmon->flag = FALSE;
+     DBG("method=%d, acline=%d, time_remaining=%d, charge=%d", battmon->method, acline, time_remaining, charge);
+From 023a0343b214385cc884471ea90bdee1f390d0c0 Mon Sep 17 00:00:00 2001
+From: John Lindgren <john@jlindgren.net>
+Date: Fri, 30 Nov 2018 22:47:10 -0500
+Subject: [PATCH] Remove deprecated /proc/acpi support in favor of sysfs.
+
+---
+ panel-plugin/libacpi.c | 364 +----------------------------------------
+ 1 file changed, 7 insertions(+), 357 deletions(-)
+
+diff --git a/panel-plugin/libacpi.c b/panel-plugin/libacpi.c
+index efb5c9c..df05185 100644
+--- a/panel-plugin/libacpi.c
++++ b/panel-plugin/libacpi.c
+@@ -58,9 +58,6 @@ static int      acpifd;
+ 
+ #include "libacpi.h"
+ 
+-#define ACBASE "/proc/acpi/ac_adapter"
+-
+-
+ static char batteries[MAXBATT][128];
+ static char battinfo[MAXBATT][128];
+ /* path to AC adapter because not all AC adapter are listed 
+@@ -207,7 +204,7 @@ int check_acpi_sysfs(void)
+ 	if (sysfs == 0)
+ 	{
+ 	#ifdef DEBUG
+-	  printf("DBG:No acpi support for sysfs. Trying procfs...\n");
++	  printf("DBG:No acpi support for sysfs.\n");
+ 	#endif
+ 	return 2;
+ 	}
+@@ -245,7 +242,7 @@ int check_acpi_sysfs(void)
+ 	if ( batt_count == 0 )
+ 	{
+ #ifdef DEBUG
+-	  printf("DBG:No acpi support for sysfs. Trying procfs...\n");
++	  printf("DBG:No acpi support for sysfs.\n");
+ #endif
+ 		acpi_sysfs = 0;
+ 		return 2;
+@@ -277,63 +274,7 @@ fopen_glob(const char *name, const char *mode)
+ int check_acpi(void)
+ {
+ #ifdef __linux__
+-	if ( check_acpi_sysfs() == 0 )
+-		return 0;
+-#endif
+-  DIR *battdir;
+-  struct dirent *batt;
+-  char *name;
+-#ifdef __linux__
+-  FILE *acpi;
+-
+-  if (!(acpi = fopen ("/proc/acpi/info", "r"))
+-      && !(acpi = fopen ("/sys/module/acpi/parameters/acpica_version", "r")))
+-  {
+-#ifdef DEBUG
+-	  printf("DBG:no acpi: /proc/acpi/info or "
+-             "/sys/module/acpi/parameters/acpica_version not found!\n");
+-#endif
+-    return 1;
+-  }
+-
+-  /* yep, all good */
+-  fclose (acpi);
+-
+-  /* now enumerate batteries */
+-  batt_count = 0;
+-  battdir = opendir ("/proc/acpi/battery");
+-  if (battdir == 0)
+-  {
+-#ifdef DEBUG
+-	  printf("DBG:No battery. /proc/acpi/battery not found!\n");
+-#endif
+-    return 2;
+-  }
+-  while ((batt = readdir (battdir)))
+-  {
+-    name = batt->d_name;
+-
+-    /* skip . and .. */
+-    if (!strncmp (".", name, 1) || !strncmp ("..", name, 2)) continue;
+-
+-    sprintf (batteries[batt_count], "/proc/acpi/battery/%s/state", name);
+-    if (!(acpi = fopen (batteries[batt_count], "r"))) {
+-       sprintf (batteries[batt_count], "/proc/acpi/battery/%s/status", name);
+-    }
+-    else fclose (acpi);
+-
+-    sprintf (battinfo[batt_count], "/proc/acpi/battery/%s/info", name);
+-#ifdef DEBUG
+-	  printf("DBG:battery number %d at:\n",batt_count);
+-	  printf("DBG:info->%s\n",battinfo[batt_count]);
+-	  printf("DBG:state->%s\n",batteries[batt_count]);
+-	  printf("DBG:------------------------\n");
+-#endif
+-
+-    batt_count++;
+-  }
+-  closedir (battdir);
+-  return 0;
++  return check_acpi_sysfs();
+ #else
+ #ifdef HAVE_SYSCTL
+   {
+@@ -434,66 +375,7 @@ int read_acad_state_sysfs(void)
+ int read_acad_state(void)
+ {
+ #ifdef __linux__
+-	if (acpi_sysfs)
+-		return read_acad_state_sysfs();
+-  FILE *acpi;
+-  char *ptr;
+-  char stat;
+-
+-  char acpath[64];
+-  char *name;
+-  DIR  *acdir;
+-  struct dirent *ac;
+-
+-  if (!(acdir=opendir(ACBASE))){
+-    return -1;
+-  }
+-  while ((ac = readdir (acdir))){
+-    name = ac->d_name;
+-
+-    /* skip . and .. */
+-    if (name[0] == '.')
+-      continue;
+-
+-    sprintf (acpath, "%s/%s/state", ACBASE, name);
+-    if (access(acpath,R_OK)){
+-      sprintf (acpath, "%s/%s/status", ACBASE, name);
+-      if (access(acpath,R_OK)){
+-	return -1;
+-      }
+-    }
+-    break; //only one ac adapter supported
+-  }
+-  closedir(acdir);
+-  acpi = fopen (acpath, "r");
+-
+-  fread (buf, 512, 1, acpi);
+-  fclose (acpi);
+-  if (!acadstate) acadstate=(ACADstate *)malloc(sizeof(ACADstate));
+-
+-  if ( (ptr = strstr(buf, "state:")) )
+-  {
+-    stat = *(ptr + 26);
+-    if (stat == 'n') acadstate->state = 1;
+-    if (stat == 'f')
+-  	{
+-	    acadstate->state = 0;
+-	    return 0;
+-  	}
+-  }
+-
+-  if ( (ptr = strstr (buf, "Status:")) )
+-  {
+-    stat = *(ptr + 26);
+-    if (stat == 'n') acadstate->state = 1;
+-    if (stat == 'f')
+-  	{
+-	    acadstate->state = 0;
+-	    return 0;
+-	  }
+-  }
+-
+-  return 1;
++  return acpi_sysfs ? read_acad_state_sysfs() : 0;
+ #else
+ #ifdef HAVE_SYSCTL
+   static char buf[BUFSIZ];
+@@ -594,121 +476,7 @@ int read_acpi_info(int battery)
+ 	  return 0;
+   }
+ 
+-	if (acpi_sysfs)
+-		return read_acpi_info_sysfs(battery);
+-  
+-	FILE *acpi;
+-  char *ptr;
+-  char stat;
+-  int temp;
+-
+-  if (!(acpi = fopen (battinfo[battery], "r"))) {
+-#ifdef DEBUG
+-	  printf("DBG:cannot open %s for read!\n",battinfo[battery]);
+-#endif
+-	  return 0;
+-  }
+-
+-#ifdef DEBUG
+-  {
+-	  int jj= fread (buf, 1,512, acpi);
+-	  printf("DBG:%d characters read from %s\n",jj,battinfo[battery]);
+-  }
+-#else
+-  fread (buf, 1,512, acpi);
+-#endif
+-  fclose (acpi);
+-
+-  if (!acpiinfo) acpiinfo=(ACPIinfo *)malloc(sizeof(ACPIinfo));
+-
+-  if ((ptr = strstr (buf, "present:")) || (ptr = strstr (buf, "Present:")))
+-  {
+-#ifdef DEBUG
+-	  printf("DBG:Battery present... and its called %s\n",battinfo[battery]);
+-#endif
+-    stat = *(ptr + 25);
+-    if (stat == 'y')
+-  	{
+-	    acpiinfo->present = 1;
+-  	  if ((ptr = strstr (buf, "design capacity:")) || (ptr = strstr (buf, "Design Capacity:")))
+-	    {
+-	      ptr += 25;
+-	      sscanf (ptr, "%d", &temp);
+-	      acpiinfo->design_capacity = temp;
+-#ifdef DEBUG
+-	  printf("DBG:design capacity:%d\n",temp);
+-#endif
+-	    }
+-	    if ((ptr = strstr (buf, "last full capacity:")) || (ptr = strstr (buf, "Last Full Capacity:")))
+-	    {
+-	      ptr += 25;
+-	      sscanf (ptr, "%d", &temp);
+-	      acpiinfo->last_full_capacity = temp;
+-#ifdef DEBUG
+-	  printf("DBG:last full capacity:%d\n",temp);
+-#endif
+-	    }
+-	    if ((ptr = strstr (buf, "battery technology:")) || (ptr = strstr (buf, "Battery Technology:")))
+-	    {
+-	      stat = *(ptr + 25);
+-	      switch (stat)
+-		    {
+-		      case 'n':
+-		        acpiinfo->battery_technology = 1;
+-		        break;
+-		      case 'r':
+-		        acpiinfo->battery_technology = 0;
+-		        break;
+-		    }
+-	    }
+-	    if ((ptr = strstr (buf, "design voltage:")) || (ptr = strstr (buf, "Design Voltage:")))
+-	    {
+-	      ptr += 25;
+-	      sscanf (ptr, "%d", &temp);
+-	      acpiinfo->design_voltage = temp;
+-#ifdef DEBUG
+-	  printf("DBG:design voltage:%d\n",temp);
+-#endif
+-	    }
+-	    if ((ptr = strstr (buf, "design capacity warning:")) || (ptr = strstr (buf, "Design Capacity Warning:")))
+-	    {
+-	      ptr += 25;
+-	      sscanf (ptr, "%d", &temp);
+-	      acpiinfo->design_capacity_warning = temp;
+-#ifdef DEBUG
+-	  printf("DBG:design capacity warning:%d\n",temp);
+-#endif
+-	    }
+-  	  if ((ptr = strstr (buf, "design capacity low:")) || (ptr = strstr (buf, "Design Capacity Low:")))
+-	    {
+-	      ptr += 25;
+-	      sscanf (ptr, "%d", &temp);
+-	      acpiinfo->design_capacity_low = temp;
+-#ifdef DEBUG
+-	  printf("DBG:design capacity low:%d\n",temp);
+-#endif
+-	    }
+-#ifdef DEBUG
+-	  printf("DBG:ALL Battery information read...\n");
+-#endif
+-	  }
+-    else /* Battery not present */
+-	  {
+-#ifdef DEBUG
+-	  printf("DBG:Battery not present!... and its called %s\n",battinfo[battery]);
+-#endif
+-	    acpiinfo->present = 0;
+-	    acpiinfo->design_capacity = 0;
+-	    acpiinfo->last_full_capacity = 0;
+-	    acpiinfo->battery_technology = 0;
+-	    acpiinfo->design_voltage = 0;
+-	    acpiinfo->design_capacity_warning = 0;
+-	    acpiinfo->design_capacity_low = 0;
+-	    return 0;
+-	  }
+-  }
+-
+-  return 1;
++  return acpi_sysfs ? read_acpi_info_sysfs(battery) : 0;
+ #else
+ #ifdef HAVE_SYSCTL
+   static char buf[BUFSIZ];
+@@ -837,112 +605,7 @@ int read_acpi_state_sysfs(int battery)
+ int read_acpi_state(int battery)
+ {
+ #ifdef __linux__
+-	if (acpi_sysfs)
+-		return read_acpi_state_sysfs(battery);
+-
+-  FILE *acpi;
+-  char *ptr;
+-  char stat;
+-
+-  int percent = 100;		/* battery percentage */
+-  int ptemp, rate, rtime = 0;
+-
+-  if (!(acpi = fopen (batteries[battery], "r"))) {
+-#ifdef DEBUG
+-	  printf("DBG:Could not open %s (%d)\n",batteries[battery],battery);
+-#endif
+-	  return 0;
+-  }
+-
+-  fread (buf, 512, 1, acpi);
+-  fclose (acpi);
+-  if (!acpistate) acpistate=(ACPIstate *)malloc(sizeof(ACPIstate));
+-
+-  if ((ptr = strstr (buf, "present:")) || (ptr = strstr (buf, "Present:")))
+-  {
+-#ifdef DEBUG
+-	  printf("DBG:Battery state present...\n");
+-#endif
+-    stat = *(ptr + 25);
+-    if (stat == 'y')
+-  	{
+-	    acpistate->present = 1;
+-	    if ((ptr = strstr (buf, "charging state:")) || (ptr = strstr (buf, "State:")))
+-	    {
+-	      stat = *(ptr + 25);
+-	      switch (stat)
+-		    {
+-		      case 'd':
+-		        acpistate->state = 1;
+-		        break;
+-		      case 'c':
+-		        if (*(ptr + 33) == '/')
+-		          acpistate->state = 0;
+-		        else
+-		          acpistate->state = 2;
+-		        break;
+-		      case 'u':
+-		        acpistate->state = 3;
+-		        break;
+-		    }
+-	    }
+-	    /* This section of the code will calculate "percentage remaining"
+-	     * using battery capacity, and the following formula
+-	     * (acpi spec 3.9.2):
+-	     *
+-	     * percentage = (current_capacity / last_full_capacity) * 100;
+-	     *
+-	     */
+-	    if ((ptr = strstr (buf, "remaining capacity:")) || (ptr = strstr (buf, "Remaining Capacity:")))
+-	    {
+-	      ptr += 25;
+-	      sscanf (ptr, "%d", &ptemp);
+-	      acpistate->rcapacity = ptemp;
+-	      percent =	(float) ((float) ptemp / (float) acpiinfo->last_full_capacity) * 100;
+-	      acpistate->percentage = percent;
+-#ifdef DEBUG
+-	  printf("DBG:remaining capacity:100 * %d/%d = %d\n",
+-			  ptemp,acpiinfo->last_full_capacity,acpistate->percentage);
+-#endif
+-	    }
+-	    if ((ptr = strstr (buf, "present rate:")) || (ptr = strstr (buf, "Present Rate:")))
+-	    {
+-	      ptr += 25;
+-	      sscanf (ptr, "%d", &rate);
+-
+-	      /* if something wrong */
+-	      if (rate <= 0) rate = 0;
+-
+-	      acpistate->prate = rate;
+-
+-	      /* time remaining in minutes */
+-	      rtime = ((float) ((float) acpistate->rcapacity /
+-				(float) acpistate->prate)) * 60;
+-	      if (rtime <= 0) rtime = 0;
+-
+-				acpistate->rtime = rtime;
+-	    }
+-	    if ((ptr = strstr (buf, "present voltage:")) || (ptr = strstr (buf, "Battery Voltage:")))
+-	    {
+-	      ptr += 25;
+-	      sscanf (ptr, "%d", &ptemp);
+-	      acpistate->pvoltage = ptemp;
+-	    }
+-	  }
+-    else /* Battery not present */
+-	  {
+-	    acpistate->present = 0;
+-	    acpistate->state = UNKNOW;
+-	    acpistate->prate = 0;
+-	    acpistate->rcapacity = 0;
+-	    acpistate->pvoltage = 0;
+-	    acpistate->rtime = 0;
+-	    acpistate->percentage = 0;
+-	    return 0;
+-	  }
+-  }
+-
+-  return 1;
++  return acpi_sysfs ? read_acpi_state_sysfs(battery) : 0;
+ #else
+ #ifdef HAVE_SYSCTL
+   char *string;
+@@ -1052,23 +715,10 @@ const char *get_temperature(void)
+ {
+ #ifdef __linux__
+   FILE *fp;
+-  char *proc_temperature="/proc/acpi/thermal_zone/*/temperature";
+   char *sys_temperature="/sys/class/thermal/thermal_zone*/temp";
+   static char *p,*p2,line[256];
+ 
+-  if ( (fp=fopen_glob(proc_temperature, "r")) != NULL )
+-  {
+-    fgets(line,255,fp);
+-    fclose(fp);
+-    p=strtok(line," ");
+-    if (!p) return NULL;
+-    p=p+strlen(p)+1;
+-    while (p && *p ==' ') p++;
+-    if (*p==0) return NULL;
+-    if (strchr(p,'\n')) p=strtok(p,"\n");
+-    return (const char *)p;
+-  }
+-  else if ( (fp=fopen_glob(sys_temperature, "r")) != NULL )
++  if ( (fp=fopen_glob(sys_temperature, "r")) != NULL )
+   {
+     fgets(line,255,fp);
+     fclose(fp);
+From 9d0c905d3af56e55a589cb057766ba4164620151 Mon Sep 17 00:00:00 2001
+From: John Lindgren <john@jlindgren.net>
+Date: Fri, 30 Nov 2018 23:21:08 -0500
+Subject: [PATCH] Linux: Allow normal startup if either AC adapter or battery
+ is found.
+
+---
+ panel-plugin/libacpi.c | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
+
+diff --git a/panel-plugin/libacpi.c b/panel-plugin/libacpi.c
+index df05185..0f524ca 100644
+--- a/panel-plugin/libacpi.c
++++ b/panel-plugin/libacpi.c
+@@ -200,6 +200,9 @@ int check_acpi_sysfs(void)
+ 	char typepath[128];
+ 	char tmptype[8];
+ 
++	acpi_sysfs = 0;
++	batt_count = 0;
++
+ 	sysfs = opendir("/sys/class/power_supply");
+ 	if (sysfs == 0)
+ 	{
+@@ -221,6 +224,7 @@ int check_acpi_sysfs(void)
+ 		fclose(typefile);
+ 		if(strncmp("Battery", tmptype, 7)==0)
+ 		{
++			acpi_sysfs = 1;
+ 			sprintf(batteries[batt_count], "/sys/class/power_supply/%s", name);
+ 		#ifdef DEBUG
+ 			printf("DBG:battery number %d at:\n",batt_count);
+@@ -231,6 +235,7 @@ int check_acpi_sysfs(void)
+ 		}
+ 		/* I guess that the type of the AC adapter is always "Mains" (?) */
+ 		else if(strncmp("Mains", tmptype, 5)==0){
++			acpi_sysfs = 1;
+ 			sprintf(sysfsacdir, "/sys/class/power_supply/%s", name);
+ 		#ifdef DEBUG
+ 			printf("DBG:sysfs AC dir->%s\n",sysfsacdir);
+@@ -239,17 +244,15 @@ int check_acpi_sysfs(void)
+ 		}
+ 	}
+ 	closedir(sysfs);
+-	if ( batt_count == 0 )
++	if ( acpi_sysfs == 0 )
+ 	{
+ #ifdef DEBUG
+ 	  printf("DBG:No acpi support for sysfs.\n");
+ #endif
+-		acpi_sysfs = 0;
+ 		return 2;
+ 	}
+ 	else
+ 	{
+-		acpi_sysfs = 1;
+ 		return 0;
+ 	}
+ }
+From c3a8821f9d34d8df8c24610afe599847bc97a788 Mon Sep 17 00:00:00 2001
+From: John Lindgren <john@jlindgren.net>
+Date: Fri, 30 Nov 2018 23:41:41 -0500
+Subject: [PATCH] Fix null pointer dereference with no battery present (Bug
+ #14930).
+
+---
+ panel-plugin/battery.c | 11 +++++------
+ 1 file changed, 5 insertions(+), 6 deletions(-)
+
+diff --git a/panel-plugin/battery.c b/panel-plugin/battery.c
+index aa63df6..8502407 100644
+--- a/panel-plugin/battery.c
++++ b/panel-plugin/battery.c
+@@ -194,9 +194,8 @@ detect_battery_info(t_battmon *battmon)
+ static gboolean
+ update_apm_status(t_battmon *battmon)
+ {
+-    int charge=0, rate;
+-
+-    int lcapacity, ccapacity;
++    int present=0, charge=0, rate=0;
++    int lcapacity=0, ccapacity=0;
+     gboolean fan=FALSE;
+     const char *temp;
+     static int old_state = -1, new_state = BM_MISSING;
+@@ -270,10 +269,10 @@ update_apm_status(t_battmon *battmon)
+     if(battmon->method == BM_USE_ACPI) {
+         int i;
+         acline = read_acad_state();
+-        lcapacity = rate = ccapacity = 0;
+         for (i=0;i<batt_count;i++) {
+           if ( !read_acpi_info(i) || !read_acpi_state(i) )
+             continue;
++          present = 1;
+           lcapacity += acpiinfo->last_full_capacity;
+           ccapacity += acpistate->rcapacity;
+           rate += acpistate->prate;
+@@ -340,7 +339,7 @@ update_apm_status(t_battmon *battmon)
+     }
+ 
+     if(battmon->options.display_icon){
+-        if((battmon->method == BM_USE_ACPI && acpiinfo->present == 0) || (battmon->method == BM_USE_APM && charge == 0)) {
++        if((battmon->method == BM_USE_ACPI && present == 0) || (battmon->method == BM_USE_APM && charge == 0)) {
+           /* battery missing */
+           icon_name = g_strdup("xfce4-battery-missing");
+           new_state = BM_MISSING;
+@@ -402,7 +401,7 @@ update_apm_status(t_battmon *battmon)
+ 
+     if(acline) {
+         char *t;
+-        if((battmon->method == BM_USE_ACPI && acpiinfo->present == 0) || (battmon->method == BM_USE_APM && charge == 0)) {
++        if((battmon->method == BM_USE_ACPI && present == 0) || (battmon->method == BM_USE_APM && charge == 0)) {
+             t=_("(No battery, AC on-line)");
+         } else {
+             t=(charge<99.9)?_("(Charging from AC)"):_("(AC on-line)");
+From 77a9b19d49c3fd4d81d52d9e2b3c5aab51d75fb3 Mon Sep 17 00:00:00 2001
+From: John Lindgren <john@jlindgren.net>
+Date: Sat, 1 Dec 2018 00:31:07 -0500
+Subject: [PATCH] Re-detect battery presence every 30 seconds (Bug #14930).
+
+---
+ panel-plugin/battery.c | 107 +++++------------------------------------
+ 1 file changed, 13 insertions(+), 94 deletions(-)
+
+diff --git a/panel-plugin/battery.c b/panel-plugin/battery.c
+index 8502407..5ed0dd2 100644
+--- a/panel-plugin/battery.c
++++ b/panel-plugin/battery.c
+@@ -88,8 +88,6 @@ typedef struct
+     GtkWidget        *timechargealignment, *actempalignment;
+     GtkWidget        *battstatus;
+     int            timeoutid;    /* To update apm status */
+-    int            method;
+-    gboolean        flag;
+     gboolean        low;
+     gboolean        critical;
+     t_battmon_options    options;
+@@ -155,45 +153,10 @@ init_options(t_battmon_options *options)
+     gdk_rgba_parse(&(options->colorC), CRITICAL_COLOR);
+ }
+ 
+-gboolean
+-detect_battery_info(t_battmon *battmon)
+-{
+-#if defined(__OpenBSD__) || defined(__NetBSD__)
+-  /* Code for OpenBSD by Joe Ammond <jra@twinight.org>. Using the same
+-     procedure as for FreeBSD.
+-     Made to work on NetBSD by Stefan Sperling <stsp@stsp.in-berlin.de>
+-  */
+-      struct apm_power_info apm;
+-      int fd;
+-
+-      battmon->method = BM_BROKEN;
+-      fd = open(APMDEVICE, O_RDONLY);
+-      if (fd == -1) return FALSE;
+-            if (ioctl(fd, APM_IOC_GETPOWER, &apm) == -1) {
+-        close(fd);
+-             return FALSE;
+-    }
+-      close(fd);
+-      battmon->method = BM_USE_APM;
+-
+-      return TRUE;
+-#else
+-    /* Check to see if ACPI is available */
+-    if(check_acpi()==0) {
+-        /* ACPI detected */
+-        battmon->method = BM_USE_ACPI;
+-        return TRUE;
+-    }
+-
+-    /* ACPI not detected/working */
+-    battmon->method = BM_BROKEN;
+-    return FALSE;
+-#endif
+-}
+-
+ static gboolean
+ update_apm_status(t_battmon *battmon)
+ {
++    int method=BM_BROKEN;
+     int present=0, charge=0, rate=0;
+     int lcapacity=0, ccapacity=0;
+     gboolean fan=FALSE;
+@@ -201,7 +164,7 @@ update_apm_status(t_battmon *battmon)
+     static int old_state = -1, new_state = BM_MISSING;
+     gchar * icon_name = NULL;
+     int time_remaining=0;
+-    gboolean acline;
++    gboolean acline=FALSE;
+     gchar buffer[128];
+     gchar *css, *color_str;
+ 
+@@ -223,7 +186,6 @@ update_apm_status(t_battmon *battmon)
+       struct apm_power_info apm;
+       int fd;
+ 
+-      battmon->method = BM_BROKEN;
+       fd = open(APMDEVICE, O_RDONLY);
+       if (fd == -1) return TRUE;
+       if (ioctl(fd, APM_IOC_GETPOWER, &apm) == -1)
+@@ -232,42 +194,15 @@ update_apm_status(t_battmon *battmon)
+       charge = apm.battery_life;
+       time_remaining = apm.minutes_left;
+       acline = apm.ac_state ? TRUE : FALSE;
+-
+-      battmon->method = BM_USE_APM;
++      method = BM_USE_APM;
+ 
+ #else
+     DBG ("Updating battery status...");
+ 
+-    if(battmon->method == BM_BROKEN) {
+-      /* See if ACPI or APM support has been enabled yet */
+-        if(!detect_battery_info(battmon)) return TRUE;
+-        if(battmon->timeoutid != 0) g_source_remove(battmon->timeoutid);
+-        /* Poll only once per minute if using ACPI due to a bug */
+-#ifdef TUTTLE_UPDATES
+-        /* what bug? I don't see any bug here. */
+-        if(battmon->method == BM_USE_ACPI) {
+-            battmon->timeoutid = g_timeout_add(60 * 1024,
+-                    (GSourceFunc) update_apm_status, battmon);
+-        }
+-            else
+-#endif
+-            battmon->timeoutid = g_timeout_add(2 * 1024,
+-                    (GSourceFunc) update_apm_status, battmon);
+-    }
+-
+-    /* Show initial state if using ACPI rather than waiting a minute */
+-    if(battmon->flag) {
+-        g_source_remove(battmon->timeoutid);
+-        /* we hit ACPI 4-5 times per poll, so polling every 2 seconds
+-	 * generates ~10 interrupts per second. updating every 30 seconds
+-	 * should be more than enough, and comes down to only 0.16
+-	 * interrupts per second, adding significant sleep time */
+-        battmon->timeoutid = g_timeout_add(30 * 1024,
+-                (GSourceFunc) update_apm_status, battmon);
+-    }
+-
+-    if(battmon->method == BM_USE_ACPI) {
++    /* Check ACPI for AC adapter and battery presence */
++    if(check_acpi() == 0) {
+         int i;
++        method = BM_USE_ACPI;
+         acline = read_acad_state();
+         for (i=0;i<batt_count;i++) {
+           if ( !read_acpi_info(i) || !read_acpi_state(i) )
+@@ -278,12 +213,6 @@ update_apm_status(t_battmon *battmon)
+           rate += acpistate->prate;
+         }
+ 
+-        if ( battmon->flag ) {
+-          last_ccapacity = ccapacity;
+-          last_lcapacity = lcapacity;
+-          last_rate = rate;
+-        }
+-
+         sum_lcapacity += lcapacity;
+         sum_ccapacity += ccapacity;
+         sum_rate += rate;
+@@ -318,10 +247,9 @@ update_apm_status(t_battmon *battmon)
+             time_remaining = 0;
+ 
+         last_acline = acline;
+-
+     }
+ #endif
+-    battmon->flag = FALSE;
++
+     DBG("method=%d, acline=%d, time_remaining=%d, charge=%d", battmon->method, acline, time_remaining, charge);
+ 
+     charge = CLAMP (charge, 0, 100);
+@@ -339,7 +267,7 @@ update_apm_status(t_battmon *battmon)
+     }
+ 
+     if(battmon->options.display_icon){
+-        if((battmon->method == BM_USE_ACPI && present == 0) || (battmon->method == BM_USE_APM && charge == 0)) {
++        if((method == BM_USE_ACPI && present == 0) || (method == BM_USE_APM && charge == 0)) {
+           /* battery missing */
+           icon_name = g_strdup("xfce4-battery-missing");
+           new_state = BM_MISSING;
+@@ -401,7 +329,7 @@ update_apm_status(t_battmon *battmon)
+ 
+     if(acline) {
+         char *t;
+-        if((battmon->method == BM_USE_ACPI && present == 0) || (battmon->method == BM_USE_APM && charge == 0)) {
++        if((method == BM_USE_ACPI && present == 0) || (method == BM_USE_APM && charge == 0)) {
+             t=_("(No battery, AC on-line)");
+         } else {
+             t=(charge<99.9)?_("(Charging from AC)"):_("(AC on-line)");
+@@ -496,7 +424,7 @@ update_apm_status(t_battmon *battmon)
+     g_free(color_str);
+ 
+     /* alarms */
+-    if (!acline && charge <= battmon->options.low_percentage){
++    if (method != BM_BROKEN && !acline && charge <= battmon->options.low_percentage) {
+         if(!battmon->critical && charge <= battmon->options.critical_percentage) {
+                battmon->critical = TRUE;
+ 	       GtkWidget *dialog;
+@@ -685,7 +613,6 @@ battmon_create(XfcePanelPlugin *plugin)
+     battmon->critical = FALSE;
+ 
+     battmon->timeoutid = 0;
+-    battmon->flag = FALSE;
+ 
+     return battmon;
+ }
+@@ -1482,20 +1409,12 @@ battmon_construct (XfcePanelPlugin *plugin)
+ 
+     xfce_panel_plugin_add_action_widget (plugin, battmon->battstatus);
+ 
+-    /* Determine what facility to use and initialize reading */
+-    battmon->method = BM_BROKEN;
++    /* Read initial battery status */
+     update_apm_status(battmon);
+ 
+-    /* If neither ACPI nor APM are enabled, check for either every 60 seconds */
++    /* Update battery status every 30 seconds */
+     if(battmon->timeoutid == 0)
+-        battmon->timeoutid = g_timeout_add(60 * 1024, (GSourceFunc) update_apm_status, battmon);
+-
+-    /* Required for the percentage and tooltip to be initially displayed due to the long timeout for ACPI */
+-    if(battmon->method == BM_USE_ACPI) {
+-        battmon->flag = TRUE;
+-        g_source_remove(battmon->timeoutid);
+-        battmon->timeoutid = g_timeout_add(1000, (GSourceFunc) update_apm_status, battmon);
+-    }
++        battmon->timeoutid = g_timeout_add_seconds(30, (GSourceFunc) update_apm_status, battmon);
+ }
+ 
+ /* register the plugin */
+From 2417d8ef81c5b7f2d519a90f1a1c67a0a8138047 Mon Sep 17 00:00:00 2001
+From: John Lindgren <john@jlindgren.net>
+Date: Sat, 1 Dec 2018 00:47:23 -0500
+Subject: [PATCH] Reset averages when a battery is removed/added (Bug #14930).
+
+---
+ panel-plugin/battery.c | 8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
+
+diff --git a/panel-plugin/battery.c b/panel-plugin/battery.c
+index 5ed0dd2..c516742 100644
+--- a/panel-plugin/battery.c
++++ b/panel-plugin/battery.c
+@@ -177,6 +177,7 @@ update_apm_status(t_battmon *battmon)
+     static int last_lcapacity = 0;
+     static int last_rate = 0;
+     static int last_acline = 0;
++    static int last_present = 0;
+ 
+ #if defined(__OpenBSD__) || defined(__NetBSD__)
+   /* Code for OpenBSD by Joe Ammond <jra@twinight.org>. Using the same
+@@ -207,7 +208,7 @@ update_apm_status(t_battmon *battmon)
+         for (i=0;i<batt_count;i++) {
+           if ( !read_acpi_info(i) || !read_acpi_state(i) )
+             continue;
+-          present = 1;
++          present++;
+           lcapacity += acpiinfo->last_full_capacity;
+           ccapacity += acpistate->rcapacity;
+           rate += acpistate->prate;
+@@ -218,8 +219,8 @@ update_apm_status(t_battmon *battmon)
+         sum_rate += rate;
+ 
+         update_time++;
+-        if ( update_time >= AVERAGING_CYCLE || last_acline != acline ) {
+-          if ( last_acline != acline ) {
++        if ( update_time >= AVERAGING_CYCLE || last_acline != acline || last_present != present ) {
++          if ( last_acline != acline || last_present != present ) {
+             last_ccapacity = ccapacity;
+             last_lcapacity = lcapacity;
+             last_rate = rate;
+@@ -247,6 +248,7 @@ update_apm_status(t_battmon *battmon)
+             time_remaining = 0;
+ 
+         last_acline = acline;
++        last_present = present;
+     }
+ #endif
+ 
+--- a/panel-plugin/battery.c
++++ b/panel-plugin/battery.c
+@@ -1376,6 +1376,33 @@ battmon_show_about(XfcePanelPlugin *plugin, t_battmon *battmon)
+       g_object_unref(G_OBJECT(icon));
+ }
+ 
++static void
++on_power_change (GDBusProxy  *proxy,
++                 GVariant    *changed_properties,
++                 const gchar *invalidated_properties,
++                 gpointer     battmon)
++{
++    update_apm_status (battmon);
++}
++
++void
++battmon_dbus_monitor (t_battmon *battmon)
++{
++    GDBusProxy *proxy;
++
++    proxy = g_dbus_proxy_new_for_bus_sync (G_BUS_TYPE_SYSTEM,
++                                           G_DBUS_PROXY_FLAGS_NONE,
++                                           NULL,
++                                           "org.freedesktop.UPower",
++                                           "/org/freedesktop/UPower",
++                                           "org.freedesktop.UPower",
++                                           NULL, NULL);
++
++    g_return_if_fail (proxy != NULL);
++
++    g_signal_connect (proxy, "g-properties-changed", G_CALLBACK (on_power_change), battmon);
++}
++
+ /* create the plugin */
+ static void
+ battmon_construct (XfcePanelPlugin *plugin)
+@@ -1417,6 +1444,9 @@ battmon_construct (XfcePanelPlugin *plugin)
+     /* Update battery status every 30 seconds */
+     if(battmon->timeoutid == 0)
+         battmon->timeoutid = g_timeout_add_seconds(30, (GSourceFunc) update_apm_status, battmon);
++
++    /* Update battery status on UPower events like power cord connected, disconnected, lid opened */
++    battmon_dbus_monitor (battmon);
+ }
+ 
+ /* register the plugin */
+--- a/configure.ac
++++ b/configure.ac
+@@ -73,6 +73,7 @@
+ XDT_CHECK_PACKAGE([LIBXFCE4UTIL], [libxfce4util-1.0], [4.8.0])
+ XDT_CHECK_PACKAGE([LIBXFCE4UI], [libxfce4ui-1], [4.8.0])
+ XDT_CHECK_PACKAGE([LIBXFCE4PANEL], [libxfce4panel-1.0], [4.8.0])
++XDT_CHECK_PACKAGE([GIO_UNIX], [gio-2.0], [2.28.0])
+ 
+ dnl ***********************************
+ dnl *** Check for debugging support ***
+From b0249556bf2e3ce8cfc19a82d1173c6157fa6c78 Mon Sep 17 00:00:00 2001
+From: Andre Miranda <andreldm@xfce.org>
+Date: Mon, 31 Dec 2018 17:55:08 -0300
+Subject: [PATCH] Fix compile error when debug is enabled
+
+---
+ panel-plugin/battery.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/panel-plugin/battery.c b/panel-plugin/battery.c
+index e45a458..6ce6f52 100644
+--- a/panel-plugin/battery.c
++++ b/panel-plugin/battery.c
+@@ -252,7 +252,7 @@ update_apm_status(t_battmon *battmon)
+     }
+ #endif
+ 
+-    DBG("method=%d, acline=%d, time_remaining=%d, charge=%d", battmon->method, acline, time_remaining, charge);
++    DBG("method=%d, acline=%d, time_remaining=%d, charge=%d", method, acline, time_remaining, charge);
+ 
+     charge = CLAMP (charge, 0, 100);
+     gtk_progress_bar_set_fraction(GTK_PROGRESS_BAR(battmon->battstatus), charge / 100.0);
+diff --git a/panel-plugin/libacpi.c b/panel-plugin/libacpi.c
+index 0f524ca..153a42b 100644
+--- a/panel-plugin/libacpi.c
++++ b/panel-plugin/libacpi.c
+@@ -59,10 +59,9 @@ static int      acpifd;
+ #include "libacpi.h"
+ 
+ static char batteries[MAXBATT][128];
+-static char battinfo[MAXBATT][128];
+ /* path to AC adapter because not all AC adapter are listed 
+ in /sys/class/power_supply/AC/ this obviously only supports one AC adapter. */
+-static char sysfsacdir[128]; 
++static char sysfsacdir[280]; 
+ 
+ #ifndef __linux__
+ #if HAVE_SYSCTL
+@@ -191,13 +190,13 @@ get_var(int *oid, int nlen)
+ #endif
+ #endif
+ 
+-int check_acpi_sysfs(void)
++static int check_acpi_sysfs(void)
+ {
+ 	DIR *sysfs;
+ 	struct dirent *batt;
+ 	char *name;
+ 	FILE *typefile;
+-	char typepath[128];
++	char typepath[300];
+ 	char tmptype[8];
+ 
+ 	acpi_sysfs = 0;
+@@ -304,9 +303,11 @@ int check_acpi(void)
+ #endif
+ }
+ 
+-int read_sysfs_int(char* filename)
++static int read_sysfs_int(char* filename)
+ {
+ 	FILE* f;
++	int out;
++
+ 	f = fopen(filename,"r");
+ 	if ( !f )
+ 	{
+@@ -315,13 +316,13 @@ int read_sysfs_int(char* filename)
+ #endif
+ 		return 0;
+ 	}
+-	int out;
++
+ 	fscanf(f,"%d",&out);
+ 	fclose(f);
+ 	return out;
+ }
+ 
+-char* read_sysfs_string(char* filename)
++static char* read_sysfs_string(char* filename)
+ {
+ 	FILE* f;
+ 	f = fopen(filename,"r");
+@@ -337,12 +338,10 @@ char* read_sysfs_string(char* filename)
+ 	return buf2;
+ }
+ 
+-int read_acad_state_sysfs(void)
++static int read_acad_state_sysfs(void)
+ {
+ 	DIR *sysfs;
+-	struct dirent *propety;
+-	char *name;
+-	char onlinefilepath[128];
++	char onlinefilepath[300];
+ 	
+ 	sysfs = opendir(sysfsacdir);
+ 	if (sysfs == 0)
+@@ -356,9 +355,10 @@ int read_acad_state_sysfs(void)
+ 	
+ 	if (!acadstate) acadstate=(ACADstate *)malloc(sizeof(ACADstate));
+ 	/* this code doesn't make much sense.. why look at the whole directory?!
++	struct dirent *propety;
+ 	while ((propety = readdir(sysfs)))
+ 	{
+-		name = propety->d_name;
++		char *name = propety->d_name;
+ 		if (!strncmp(".", name, 1) || !strncmp("..", name, 2)) continue;
+ 		
+ 		if (strcmp(name,"online") == 0)
+@@ -410,7 +410,7 @@ int read_acad_state(void)
+ #endif
+ }
+ 
+-int read_acpi_info_sysfs(int battery)
++static int read_acpi_info_sysfs(int battery)
+ {
+ 	DIR *sysfs;
+ 	struct dirent *propety;
+@@ -537,7 +537,7 @@ int read_acpi_info(int battery)
+ 
+ }
+ 
+-int read_acpi_state_sysfs(int battery)
++static int read_acpi_state_sysfs(int battery)
+ {
+ 	DIR *sysfs;
+ 	struct dirent *propety;
+From b32c015ed36c0f6e9e053351482303a15615847a Mon Sep 17 00:00:00 2001
+From: Andre Miranda <andreldm@xfce.org>
+Date: Mon, 31 Dec 2018 18:15:52 -0300
+Subject: [PATCH] Fix possible memory leak
+
+---
+ panel-plugin/battery.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/panel-plugin/battery.c b/panel-plugin/battery.c
+index 630e157..7ee4cb1 100644
+--- a/panel-plugin/battery.c
++++ b/panel-plugin/battery.c
+@@ -294,9 +294,11 @@ update_apm_status(t_battmon *battmon)
+           new_state = BM_FULL;
+         }
+         if (acline && new_state != BM_MISSING) {
++            gchar *tmp = g_strdup(icon_name);
++            g_free(icon_name);
+             new_state++;
+-            gchar * tmp = g_strdup(icon_name); g_free(icon_name);
+             icon_name = g_strconcat(tmp, "-charging", NULL);
++            g_free(tmp);
+         }
+         DBG("old_state=%d, new_state=%d, icon_name=%s", old_state, new_state, icon_name);
+         if (old_state != new_state)

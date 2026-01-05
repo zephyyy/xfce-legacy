@@ -1,0 +1,53 @@
+From b460a31df1c182923b7d1f1a5b47ade9644b4e35 Mon Sep 17 00:00:00 2001
+From: rbuj <robert.buj@gmail.com>
+Date: Sat, 24 Aug 2019 12:21:31 +0200
+Subject: [PATCH] glib-utils: Remove unused function - g_ptr_array_copy
+
+closes https://github.com/mate-desktop/engrampa/issues/283
+---
+ src/glib-utils.c | 16 ----------------
+ src/glib-utils.h |  1 -
+ 2 files changed, 17 deletions(-)
+
+diff --git a/src/glib-utils.c b/src/glib-utils.c
+index 27d4548..38d7845 100644
+--- a/src/glib-utils.c
++++ b/src/glib-utils.c
+@@ -568,22 +568,6 @@ get_time_string (time_t time)
+ }
+ 
+ 
+-GPtrArray *
+-g_ptr_array_copy (GPtrArray *array)
+-{
+-	GPtrArray *new_array;
+-	
+-	if (array == NULL)
+-		return NULL;
+-		
+-	new_array = g_ptr_array_sized_new (array->len);
+-	memcpy (new_array->pdata, array->pdata, array->len * sizeof (gpointer)); 
+-	new_array->len = array->len;
+-	
+-	return new_array;
+-}
+-
+-
+ void
+ g_ptr_array_free_full (GPtrArray *array,
+                        GFunc      free_func,
+diff --git a/src/glib-utils.h b/src/glib-utils.h
+index 0c8f88b..d9a2f79 100644
+--- a/src/glib-utils.h
++++ b/src/glib-utils.h
+@@ -66,7 +66,6 @@ const char *        get_last_field               (const char  *line,
+ 						  int          last_field);
+ int                 n_fields                     (char       **str_array);
+ char *              get_time_string              (time_t       time);
+-GPtrArray *         g_ptr_array_copy             (GPtrArray   *array);
+ void                g_ptr_array_free_full        (GPtrArray   *array,
+                        				  GFunc        func,
+                        				  gpointer     user_data);
+-- 
+2.26.2
+

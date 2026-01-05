@@ -1,0 +1,221 @@
+diff --git a/Makefile.am b/Makefile.am
+index c99db1e..58633c6 100644
+--- a/Makefile.am
++++ b/Makefile.am
+@@ -1,32 +1,8 @@
+-SUBDIRS = po libwindow-settings capplets font-viewer help man
+-DIST_SUBDIRS = po libwindow-settings capplets font-viewer help libslab shell typing-break man
+-
+-if HAVE_LIBMATESLAB
+-SUBDIRS += libslab
+-endif
+-
+-if HAVE_LIBMATESLAB
+-SUBDIRS += shell
+-endif
+-
+-if HAVE_TYPING_BREAK
+-SUBDIRS += typing-break
+-endif
+-
+-@INTLTOOL_XML_NOMERGE_RULE@
+-gsettingsschema_in_files = \
+-	org.mate.control-center.gschema.xml.in \
+-	org.mate.control-center.keybinding.gschema.xml.in
+-
+-gsettings_SCHEMAS = $(gsettingsschema_in_files:.xml.in=.xml)
+-@GSETTINGS_RULES@
++SUBDIRS = capplets font-viewer man
++DIST_SUBDIRS = capplets font-viewer man
+ 
+ ACLOCAL_AMFLAGS = -I m4 ${ACLOCAL_FLAGS}
+ 
+-CLEANFILES = \
+-	$(gsettings_SCHEMAS) \
+-	*.gschema.valid
+-
+ MAINTAINERCLEANFILES = \
+ 	$(srcdir)/INSTALL \
+ 	$(srcdir)/aclocal.m4 \
+diff --git a/capplets/Makefile.am b/capplets/Makefile.am
+index d123652..6a39891 100644
+--- a/capplets/Makefile.am
++++ b/capplets/Makefile.am
+@@ -1,27 +1,7 @@
+ SUBDIRS = \
+-	common \
+-	accessibility \
+-	appearance \
+-	default-applications \
+-	display \
+-	keyboard \
+-	keybindings \
+-	mouse \
+-	network \
+-	windows \
+-        about-me
++	common
+ 
+ DIST_SUBDIRS = \
+-	common \
+-	accessibility \
+-	appearance \
+-	default-applications \
+-	keybindings \
+-	keyboard \
+-	mouse \
+-	network \
+-	windows \
+-	display \
+-	about-me
++	common
+ 
+ -include $(top_srcdir)/git.mk
+diff --git a/capplets/common/Makefile.am b/capplets/common/Makefile.am
+index e9cb41d..69be1fd 100644
+--- a/capplets/common/Makefile.am
++++ b/capplets/common/Makefile.am
+@@ -21,8 +21,6 @@ AM_CPPFLAGS = \
+ noinst_LTLIBRARIES = libcommon.la
+ 
+ libcommon_la_SOURCES = \
+-	activate-settings-daemon.c	\
+-	activate-settings-daemon.h	\
+ 	capplet-stock-icons.c		\
+ 	capplet-stock-icons.h		\
+ 	capplet-util.c			\
+@@ -31,34 +29,16 @@ libcommon_la_SOURCES = \
+ 	dconf-util.h				\
+ 	file-transfer-dialog.c		\
+ 	file-transfer-dialog.h		\
+-	mate-theme-apply.c		\
+-	mate-theme-apply.h 		\
+-	mate-theme-info.c		\
+-	mate-theme-info.h		\
+ 	gtkrc-utils.c			\
+ 	gtkrc-utils.h			\
+-	theme-thumbnail.c		\
+-	theme-thumbnail.h		\
+ 	wm-common.c			\
+ 	wm-common.h
+ 
+ libcommon_la_LIBADD =							\
+-	$(top_builddir)/libwindow-settings/libmate-window-settings.la  \
+ 	$(MARCO_LIBS)						\
+ 	$(DBUS_LIBS)							\
+ 	$(MATE_DESKTOP_LIBS)						\
+ 	$(GIO_LIBS)									\
+ 	$(DCONF_LIBS)
+ 
+-mate_theme_test_SOURCES = \
+-	mate-theme-test.c
+-
+-mate_theme_test_LDADD = 						\
+-	libcommon.la							\
+-	$(MATECC_CAPPLETS_LIBS)						\
+-	$(MATECC_LIBS)
+-
+-noinst_PROGRAMS = \
+-	mate-theme-test
+-
+ -include $(top_srcdir)/git.mk
+diff --git a/configure.ac b/configure.ac
+index 92fc4af..0ac5be7 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -130,18 +130,11 @@ COMMON_MODULES="gtk+-3.0 >= $GTK_REQUIRED dnl
+  gthread-2.0 dnl
+  gio-2.0 dnl
+  gio-unix-2.0 dnl
+- libxml-2.0 dnl
+- mate-desktop-2.0 >= $MATE_DESKTOP_REQUIRED"
++ libxml-2.0"
+ PKG_CHECK_MODULES(CAPPLET, $COMMON_MODULES)
+-PKG_CHECK_MODULES(MATECC, $COMMON_MODULES libmate-menu >= 1.21.0)
+-PKG_CHECK_MODULES(MATECC_SHELL, $COMMON_MODULES libmate-menu)
+ 
+ PKG_CHECK_MODULES(DBUS, dbus-1 dbus-glib-1)
+-PKG_CHECK_MODULES(MATE_DESKTOP, mate-desktop-2.0 >= $MATE_DESKTOP_REQUIRED)
+ PKG_CHECK_MODULES(DEFAULT_APPLICATIONS_CAPPLET, libxml-2.0)
+-PKG_CHECK_MODULES(MARCO, libmarco-private >= $MARCO_REQUIRED)
+-PKG_CHECK_MODULES(TYPING, $GMODULE_ADD glib-2.0 >= $GLIB_REQUIRED gio-2.0 gtk+-3.0 >= $GTK_REQUIRED)
+-PKG_CHECK_MODULES(GSD_DBUS, mate-settings-daemon >= $MSD_REQUIRED)
+ PKG_CHECK_MODULES(GIO, gio-2.0)
+ 
+ PKG_CHECK_MODULES([DCONF], [dconf >= 0.13.4])
+@@ -159,7 +152,7 @@ dnl
+ dnl Check dependencies of libmate-slab
+ dnl
+ PKG_CHECK_MODULES(LIBSLAB, [
+-			   gio-2.0 mate-desktop-2.0 librsvg-2.0 libmate-menu pango
++			   gio-2.0 librsvg-2.0 libmate-menu pango
+ 			   ],
+ 			   have_libmateslab=yes,
+ 			   have_libmateslab=no)
+@@ -190,7 +183,7 @@ AM_CONDITIONAL([HAVE_ACCOUNTSSERVICE], [test "x$have_accountsservice" = xyes])
+ 
+ 
+ PKG_CHECK_MODULES(FONT_CAPPLET, $COMMON_MODULES pango)
+-PKG_CHECK_MODULES(FONT_VIEWER, $COMMON_MODULES fontconfig freetype2 mate-desktop-2.0)
++PKG_CHECK_MODULES(FONT_VIEWER, $COMMON_MODULES fontconfig freetype2)
+ 
+ PKG_CHECK_MODULES(AT_CAPPLET, $COMMON_MODULES)
+ 
+@@ -214,14 +207,6 @@ PKG_CHECK_MODULES(XINPUT, xi >= 1.5)
+ 
+ CAPPLET_LIBS="$CAPPLET_LIBS $XINPUT_LIBS"
+ 
+-PKG_CHECK_MODULES(LIBMATEKBD, [libmatekbd >= $MATEKBD_REQUIRED libxklavier >= 5.2])
+-AC_SUBST(LIBMATEKBD_CFLAGS)
+-AC_SUBST(LIBMATEKBD_LIBS)
+-
+-PKG_CHECK_MODULES(LIBMATEKBDUI, [libmatekbdui >= $MATEKBD_REQUIRED])
+-AC_SUBST(LIBMATEKBDUI_CFLAGS)
+-AC_SUBST(LIBMATEKBDUI_LIBS)
+-
+ dnl ==============================================
+ dnl End: Check that we meet the  dependencies
+ dnl ==============================================
+diff --git a/font-viewer/font-model.c b/font-viewer/font-model.c
+index f0d6fdf..237fdee 100644
+--- a/font-viewer/font-model.c
++++ b/font-viewer/font-model.c
+@@ -35,9 +35,6 @@
+ #include FT_FREETYPE_H
+ #include <fontconfig/fontconfig.h>
+ 
+-#define MATE_DESKTOP_USE_UNSTABLE_API
+-#include <libmate-desktop/mate-desktop-thumbnail.h>
+-
+ #include "font-model.h"
+ #include "font-utils.h"
+ #include "sushi-font-loader.h"
+@@ -172,7 +169,6 @@ static GdkPixbuf *
+ create_thumbnail (ThumbInfoData *thumb_info)
+ {
+     GFile *file = thumb_info->font_file;
+-    MateDesktopThumbnailFactory *factory;
+     guint64 mtime;
+ 
+     GdkPixbuf *pixbuf = NULL;
+@@ -190,20 +186,6 @@ create_thumbnail (ThumbInfoData *thumb_info)
+ 
+     mtime = g_file_info_get_attribute_uint64 (info, G_FILE_ATTRIBUTE_TIME_MODIFIED);
+ 
+-    factory = mate_desktop_thumbnail_factory_new (MATE_DESKTOP_THUMBNAIL_SIZE_NORMAL);
+-    pixbuf = mate_desktop_thumbnail_factory_generate_thumbnail
+-        (factory,
+-         thumb_info->uri, g_file_info_get_content_type (info));
+-
+-    if (pixbuf != NULL)
+-        mate_desktop_thumbnail_factory_save_thumbnail (factory, pixbuf,
+-                                                       thumb_info->uri, (time_t) mtime);
+-    else
+-        mate_desktop_thumbnail_factory_create_failed_thumbnail (factory,
+-                                                                thumb_info->uri, (time_t) mtime);
+-
+-  g_object_unref (factory);
+-
+  out:
+   g_clear_object (&info);
+ 

@@ -1,0 +1,55 @@
+diff --git a/src/applet.c b/src/applet.c
+index c7a9f56a..f0a88299 100644
+--- a/src/applet.c
++++ b/src/applet.c
+@@ -1467,8 +1467,6 @@ nma_menu_add_vpn_submenu (GtkWidget *menu, NMApplet *applet)
+ 	GPtrArray *list;
+ 	int i;
+ 
+-	nma_menu_add_separator_item (menu);
+-
+ 	vpn_menu = GTK_MENU (gtk_menu_new ());
+ 
+ 	item = GTK_MENU_ITEM (gtk_menu_item_new_with_mnemonic (_("_VPN Connections")));
+@@ -1634,14 +1632,14 @@ static void nma_menu_show_cb (GtkWidget *menu, NMApplet *applet)
+ 	}
+ 
+ 	nma_menu_add_devices (menu, applet);
+-	nma_menu_add_vpn_submenu (menu, applet);
+ 
+ 	if (has_usable_wifi (applet)) {
+ 		/* Add the "Hidden Wi-Fi network..." entry */
+-		nma_menu_add_separator_item (menu);
+ 		nma_menu_add_hidden_network_item (menu, applet);
+ 		nma_menu_add_create_network_item (menu, applet);
++		nma_menu_add_separator_item (menu);
+ 	}
++	nma_menu_add_vpn_submenu (menu, applet);
+ 
+ 	if (!INDICATOR_ENABLED (applet))
+ 		gtk_widget_show_all (menu);
+@@ -1896,10 +1894,10 @@ static void nma_context_menu_populate (NMApplet *applet, GtkMenu *menu)
+ 				   applet);
+ 	gtk_menu_shell_append (menu_shell, applet->connections_menu_item);
+ 
+-	/* Separator */
+-	nma_menu_add_separator_item (GTK_WIDGET (menu_shell));
+-
+ 	if (!INDICATOR_ENABLED (applet)) {
++		/* Separator */
++		nma_menu_add_separator_item (GTK_WIDGET (menu_shell));
++
+ 		/* About item */
+ 		GtkWidget *menu_item;
+ 
+@@ -2043,9 +2041,9 @@ applet_update_menu (gpointer user_data)
+ 
+ 	/* Update the menu */
+ 	if (INDICATOR_ENABLED (applet)) {
+-		nma_context_menu_populate (applet, menu);
+ 		nma_menu_show_cb (GTK_WIDGET (menu), applet);
+ 		nma_menu_add_separator_item (GTK_WIDGET (menu));
++		nma_context_menu_populate (applet, menu);
+ 		nma_context_menu_update (applet);
+ 	} else {
+ 		nma_menu_show_cb (GTK_WIDGET (menu), applet);

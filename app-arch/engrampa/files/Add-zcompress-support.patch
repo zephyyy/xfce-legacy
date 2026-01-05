@@ -1,0 +1,131 @@
+From 6e83b96598cb1583217c17344bd27881938a98c2 Mon Sep 17 00:00:00 2001
+From: Sergey Ponomarev <stokito@gmail.com>
+Date: Sat, 3 Nov 2018 22:59:40 +0200
+Subject: [PATCH 1/2] Add zcompress support
+
+---
+ caja/caja-engrampa.c        |  1 +
+ data/engrampa.desktop.in.in |  2 +-
+ data/packages.match         |  1 +
+ src/fr-command-cfile.c      | 21 +++++++++++++++++++++
+ src/fr-init.c               |  2 ++
+ 5 files changed, 26 insertions(+), 1 deletion(-)
+
+diff --git a/caja/caja-engrampa.c b/caja/caja-engrampa.c
+index 6247609..589aae1 100644
+--- a/caja/caja-engrampa.c
++++ b/caja/caja-engrampa.c
+@@ -200,6 +200,7 @@ static struct {
+ 		{ "application/x-zip-compressed", TRUE },
+ 		{ "application/x-zoo", TRUE },
+ 		{ "application/zip", TRUE },
++		{ "application/zstd", TRUE },
+ 		{ "multipart/x-zip", TRUE },
+ 		{ NULL, FALSE }
+ };
+diff --git a/data/engrampa.desktop.in.in b/data/engrampa.desktop.in.in
+index 5f1a9db..8146857 100644
+--- a/data/engrampa.desktop.in.in
++++ b/data/engrampa.desktop.in.in
+@@ -9,7 +9,7 @@ Terminal=false
+ Type=Application
+ Icon=engrampa
+ Categories=GTK;Utility;Archiving;Compression;
+-MimeType=application/x-7z-compressed;application/x-7z-compressed-tar;application/x-ace;application/x-alz;application/x-ar;application/x-arj;application/x-bzip;application/x-bzip-compressed-tar;application/x-bzip1;application/x-bzip1-compressed-tar;application/x-cabinet;application/x-cbr;application/x-cbz;application/x-cd-image;application/x-compress;application/x-compressed-tar;application/x-cpio;application/x-deb;application/x-ear;application/x-ms-dos-executable;application/x-gtar;application/x-gzip;application/x-gzpostscript;application/x-java-archive;application/x-lha;application/x-lhz;application/x-lrzip;application/x-lrzip-compressed-tar;application/x-lzip;application/x-lzip-compressed-tar;application/x-lzma;application/x-lzma-compressed-tar;application/x-lzop;application/x-lzop-compressed-tar;application/x-ms-wim;application/x-rar;application/x-rar-compressed;application/x-rpm;application/x-rzip;application/x-tar;application/x-tarz;application/x-stuffit;application/x-war;application/x-xz;application/x-xz-compressed-tar;application/x-zip;application/x-zip-compressed;application/x-zoo;application/zip;application/x-archive;application/vnd.ms-cab-compressed;
++MimeType=application/x-7z-compressed;application/x-7z-compressed-tar;application/x-ace;application/x-alz;application/x-ar;application/x-arj;application/x-bzip;application/x-bzip-compressed-tar;application/x-bzip1;application/x-bzip1-compressed-tar;application/x-cabinet;application/x-cbr;application/x-cbz;application/x-cd-image;application/x-compress;application/x-compressed-tar;application/x-cpio;application/x-deb;application/x-ear;application/x-ms-dos-executable;application/x-gtar;application/x-gzip;application/x-gzpostscript;application/x-java-archive;application/x-lha;application/x-lhz;application/x-lrzip;application/x-lrzip-compressed-tar;application/x-lzip;application/x-lzip-compressed-tar;application/x-lzma;application/x-lzma-compressed-tar;application/x-lzop;application/x-lzop-compressed-tar;application/x-ms-wim;application/x-rar;application/x-rar-compressed;application/x-rpm;application/x-rzip;application/x-tar;application/x-tarz;application/x-stuffit;application/x-war;application/x-xz;application/x-xz-compressed-tar;application/x-zip;application/x-zip-compressed;application/x-zoo;application/zip;application/x-archive;application/vnd.ms-cab-compressed;application/zstd;
+ Keywords=MATE;archive;manager;compression;
+ X-MATE-DocPath=engrampa/engrampa.xml
+ X-MATE-Bugzilla-Bugzilla=MATE
+diff --git a/data/packages.match b/data/packages.match
+index 78b9fe3..016c33b 100644
+--- a/data/packages.match
++++ b/data/packages.match
+@@ -28,4 +28,5 @@ unzip=
+ xz=
+ zip=
+ zoo=
++zstd=
+ 
+diff --git a/src/fr-command-cfile.c b/src/fr-command-cfile.c
+index 463e156..4e4c8df 100644
+--- a/src/fr-command-cfile.c
++++ b/src/fr-command-cfile.c
+@@ -290,6 +290,13 @@ fr_command_cfile_add (FrCommand     *comm,
+ 		fr_process_end_command (comm->process);
+ 		compressed_filename = g_strconcat (filename, ".rz", NULL);
+ 	}
++	else if (is_mime_type (comm->mime_type, "application/zstd")) {
++		fr_process_begin_command (comm->process, "zstd");
++		fr_process_set_working_dir (comm->process, temp_dir);
++		fr_process_add_arg (comm->process, filename);
++		fr_process_end_command (comm->process);
++		compressed_filename = g_strconcat (filename, ".zst", NULL);
++	}
+ 
+       	/* copy compressed file to the dest dir */
+ 
+@@ -420,6 +427,13 @@ fr_command_cfile_extract (FrCommand  *comm,
+ 		fr_process_add_arg (comm->process, temp_file);
+ 		fr_process_end_command (comm->process);
+ 	}
++	else if (is_mime_type (comm->mime_type, "application/zstd")) {
++		fr_process_begin_command (comm->process, "zstd");
++		fr_process_add_arg (comm->process, "-f");
++		fr_process_add_arg (comm->process, "-d");
++		fr_process_add_arg (comm->process, temp_file);
++		fr_process_end_command (comm->process);
++	}
+ 
+ 	/* copy uncompress file to the dest dir */
+ 
+@@ -463,6 +477,7 @@ const char *cfile_mime_type[] = { "application/x-gzip",
+ 				  "application/x-lzop",
+ 				  "application/x-rzip",
+ 				  "application/x-xz",
++				  "application/zstd",
+ 				  NULL };
+ 
+ 
+@@ -515,6 +530,10 @@ fr_command_cfile_get_capabilities (FrCommand  *comm,
+ 		if (is_program_available ("rzip", check_command))
+ 			capabilities |= FR_COMMAND_CAN_READ_WRITE;
+ 	}
++	else if (is_mime_type (mime_type, "application/zstd")) {
++		if (is_program_available ("zstd", check_command))
++			capabilities |= FR_COMMAND_CAN_READ_WRITE;
++	}
+ 
+ 	return capabilities;
+ }
+@@ -552,6 +571,8 @@ fr_command_cfile_get_packages (FrCommand  *comm,
+ 		return PACKAGES ("lzop");
+ 	else if (is_mime_type (mime_type, "application/x-rzip"))
+ 		return PACKAGES ("rzip");
++	else if (is_mime_type (mime_type, "application/zstd"))
++		return PACKAGES ("zstd");
+ 
+ 	return NULL;
+ }
+diff --git a/src/fr-init.c b/src/fr-init.c
+index acc8b44..8e28404 100644
+--- a/src/fr-init.c
++++ b/src/fr-init.c
+@@ -101,6 +101,7 @@ FrMimeTypeDescription mime_type_desc[] = {
+ 	{ "application/x-xz-compressed-tar",    ".tar.xz",   N_("Tar compressed with xz (.tar.xz)"), 0 },
+ 	{ "application/x-zoo",                  ".zoo",      N_("Zoo (.zoo)"), 0 },
+ 	{ "application/zip",                    ".zip",      N_("Zip (.zip)"), 0 },
++	{ "application/zstd",                   ".zst",      N_("Zstandard (.ztd)"), 0 },
+ 	{ NULL, NULL, NULL, 0 }
+ };
+ 
+@@ -160,6 +161,7 @@ FrExtensionType file_ext_type[] = {
+ 	{ ".Z", "application/x-compress" },
+ 	{ ".zip", "application/zip" },
+ 	{ ".zoo", "application/x-zoo" },
++	{ ".zst", "application/zstd" },
+ 	{ NULL, NULL }
+ };
+ 
+-- 
+2.26.2
+

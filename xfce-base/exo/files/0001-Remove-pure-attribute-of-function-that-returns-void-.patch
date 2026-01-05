@@ -1,0 +1,27 @@
+From 1a3827a40e653fb373e92cdc334b84b0f989d428 Mon Sep 17 00:00:00 2001
+From: Andre Miranda <andreldm@xfce.org>
+Date: Sat, 2 Jun 2018 00:45:00 -0300
+Subject: [PATCH] Remove pure attribute of function that returns void (bug
+ 14427)
+
+Signed-off-by: Sean Davis <smd.seandavis@gmail.com>
+---
+ exo/exo-utils.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/exo/exo-utils.h b/exo/exo-utils.h
+index 441a8816..d452f543 100644
+--- a/exo/exo-utils.h
++++ b/exo/exo-utils.h
+@@ -28,7 +28,7 @@
+ 
+ G_BEGIN_DECLS
+ 
+-void                    exo_noop        (void) G_GNUC_PURE;
++void                    exo_noop        (void);
+ gint                    exo_noop_one    (void) G_GNUC_PURE;
+ gint                    exo_noop_zero   (void) G_GNUC_PURE;
+ gpointer                exo_noop_null   (void) G_GNUC_PURE;
+-- 
+2.26.2
+

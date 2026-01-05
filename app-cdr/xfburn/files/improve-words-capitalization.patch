@@ -1,0 +1,36 @@
+From 6895e0ed72f55eba2ad973c2176812a691324ccb Mon Sep 17 00:00:00 2001
+From: Andre Miranda <andre42m@gmail.com>
+Date: Sun, 23 Sep 2018 16:02:32 -0300
+Subject: [PATCH] Improve words capitalization
+
+---
+ xfburn/xfburn-main-window.c | 2 +-
+ xfburn/xfburn-welcome-tab.c | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/xfburn/xfburn-main-window.c b/xfburn/xfburn-main-window.c
+index 1fd4656a..9830238d 100644
+--- a/xfburn/xfburn-main-window.c
++++ b/xfburn/xfburn-main-window.c
+@@ -535,7 +535,7 @@ action_about (GtkAction * action, XfburnMainWindow * window)
+ 		  "program-name", "Xfburn",
+ 		  "license", xfce_get_license_text (XFCE_LICENSE_TEXT_GPL),
+ 		  "version", VERSION,
+-		  "comments", _("Another cd burning GUI"),
++		  "comments", _("Another CD burning GUI"),
+ 		  "website", "http://www.xfce.org/projects/xfburn",
+ 		  "copyright", "2005-2008 David Mohr, Mario Đanić, Jean-François Wauthy",
+ 		  "authors", auth, 
+diff --git a/xfburn/xfburn-welcome-tab.c b/xfburn/xfburn-welcome-tab.c
+index 2bfe1b5e..f4dad4d0 100644
+--- a/xfburn/xfburn-welcome-tab.c
++++ b/xfburn/xfburn-welcome-tab.c
+@@ -126,7 +126,7 @@ xfburn_welcome_tab_init (XfburnWelcomeTab * obj)
+   gtk_container_add (GTK_CONTAINER (align), vbox);
+   gtk_widget_show (vbox);
+ 
+-  label_welcome = gtk_label_new (_("Welcome to xfburn!"));
++  label_welcome = gtk_label_new (_("Welcome to Xfburn!"));
+   gtk_box_pack_start (GTK_BOX (vbox), label_welcome, FALSE, FALSE, BORDER);
+   gtk_widget_show (label_welcome);
+ 

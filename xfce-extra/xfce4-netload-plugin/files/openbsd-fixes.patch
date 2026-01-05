@@ -1,0 +1,72 @@
+From 5829523b18fd83fa75daf6dc010c978251d3a9ac Mon Sep 17 00:00:00 2001
+From: Landry Breuil <landry@xfce.org>
+Date: Wed, 29 Nov 2017 09:59:02 +0100
+Subject: [PATCH] Fix stats on some openbsd drivers (bug #13853)
+
+some driver names are not null-ended (re, nfe?), leading to failing
+comparisons. On top of this the comparison was wrong.
+Simpler patch than the one provided by Ed Hynan, thanks for the detailed bug
+report and thorough analysis.
+---
+ panel-plugin/wormulon/openbsd.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/panel-plugin/wormulon/openbsd.c b/panel-plugin/wormulon/openbsd.c
+index 7a79f7b..b138c6b 100644
+--- a/panel-plugin/wormulon/openbsd.c
++++ b/panel-plugin/wormulon/openbsd.c
+@@ -149,10 +149,10 @@ int get_stat(netdata* data)
+             /* search for the right network interface */
+             if (sdl->sdl_family != AF_LINK)
+                 continue;
+-            if (strcmp(sdl->sdl_data, data->ifdata.if_name) != 0)
+-                continue;
+             strncpy(s, sdl->sdl_data, sdl->sdl_nlen);
+             s[sdl->sdl_nlen] = '\0';
++            if (strcmp(s, data->ifdata.if_name) != 0)
++                continue;
+ 
+             rx_o = data->stats.rx_bytes; tx_o = data->stats.tx_bytes;
+             /* write stats */
+---
+From 6192f5b356e4a7986e6f396972c0b2362331194d Mon Sep 17 00:00:00 2001
+From: Theo Buehler <tb@openbsd.org>
+Date: Fri, 17 Jul 2020 10:55:49 +0200
+Subject: [PATCH] Fix type for media_list on OpenBSD
+
+The `SIOCGIFMEDIA` ioctl was changed in OpenBSD to take a `uint64_t` for
+`ifm_ulist` in [this OpenBSD commit][1].  The current code results in a
+buffer overflow.
+
+Resolves #16
+
+[1]: https://github.com/openbsd/src/commit/f2a0e4231559234e0dc6d691942c15503a0dc417
+---
+ panel-plugin/wormulon/if_media.c | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/panel-plugin/wormulon/if_media.c b/panel-plugin/wormulon/if_media.c
+index 331cc49..97a53cc 100644
+--- a/panel-plugin/wormulon/if_media.c
++++ b/panel-plugin/wormulon/if_media.c
+@@ -36,7 +36,11 @@ int get_if_speed (char *ifstring)
+     int speed=ERR_IFACE_NO_SPEED;
+     int s; /* socket */
+     struct ifmediareq ifmr;
++#if defined(__OpenBSD__)
++    uint64_t *media_list;
++#else
+     int *media_list;
++#endif
+     int type, physical;
+ 
+     if ((s = socket(AF_INET, SOCK_DGRAM, 0)) == NULL)
+@@ -60,7 +64,7 @@ int get_if_speed (char *ifstring)
+         return ERR_IFACE_NO_SPEED;
+     }
+ 
+-    media_list = (int *)malloc(ifmr.ifm_count * sizeof(int));
++    media_list = malloc(ifmr.ifm_count * sizeof(*media_list));
+     if (media_list == NULL)
+         fprintf(stderr, "malloc() error in if_media.c\n");
+     ifmr.ifm_ulist = media_list;

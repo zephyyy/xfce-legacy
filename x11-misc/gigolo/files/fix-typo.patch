@@ -1,0 +1,25 @@
+From f83c6f4d9388a2c3d9a81dbbd184e27f91e3bbc8 Mon Sep 17 00:00:00 2001
+From: Yves-Alexis Perez <corsac@debian.org>
+Date: Sat, 15 Dec 2018 14:34:00 +0100
+Subject: [PATCH] Fix typo in src/backendgvfs.c
+
+---
+ src/backendgvfs.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/backendgvfs.c b/src/backendgvfs.c
+index 9478448..044889b 100644
+--- a/src/backendgvfs.c
++++ b/src/backendgvfs.c
+@@ -459,7 +459,7 @@ static void volume_mount_finished_cb(GObject *src, GAsyncResult *res, gpointer b
+ 		}
+ 	}
+ 	else
+-		verbose("Mount finished sucessfully");
++		verbose("Mount finished successfully");
+ }
+ 
+ 
+-- 
+GitLab
+

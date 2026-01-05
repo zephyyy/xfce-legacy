@@ -1,0 +1,163 @@
+--- a/configure.ac
++++ b/configure.ac
+@@ -46,6 +46,7 @@
+ dnl *** Check for standard headers ***
+ dnl **********************************
+ AC_HEADER_STDC()
++AC_CHECK_HEADERS([sys/sysmacros.h])
+ AC_CHECK_LIBM
+ AC_SUBST(LIBM)
+ 
+--- a/panel-plugin/config_gui.c
++++ b/panel-plugin/config_gui.c
+@@ -110,7 +110,7 @@
+ 		      (GtkAttachOptions) (0), 0, 0);
+     gtk_widget_set_tooltip_text (wTF_Device,
+ 			  _("Input the device name, then press <Enter>"));
+-    gtk_entry_set_max_length (GTK_ENTRY (wTF_Device), 64);
++    gtk_entry_set_max_length (GTK_ENTRY (wTF_Device), 128);
+     gtk_entry_set_text (GTK_ENTRY (wTF_Device), _("/dev/sda1"));
+ 
+     eventbox1 = gtk_event_box_new ();
+@@ -202,7 +202,7 @@
+     gtk_box_pack_start (GTK_BOX (wHBox_MaxIO), wTF_MaxXfer, TRUE, TRUE, 0);
+     gtk_widget_set_tooltip_text (wTF_MaxXfer,
+ 			  _("Input the maximum I/O transfer rate of the device, then press <Enter>"));
+-    gtk_entry_set_max_length (GTK_ENTRY (wTF_MaxXfer), 3);
++    gtk_entry_set_max_length (GTK_ENTRY (wTF_MaxXfer), 5);
+     gtk_entry_set_text (GTK_ENTRY (wTF_MaxXfer), _("35"));
+ 
+     hseparator8 = gtk_hseparator_new ();
+--- a/panel-plugin/devperf.c
++++ b/panel-plugin/devperf.c
+@@ -33,6 +33,12 @@
+ #include <string.h>
+ #include <errno.h>
+ #include <sys/time.h>
++/* for major() and minor() */
++#define _BSD_SOURCE
++#ifdef HAVE_SYS_SYSMACROS_H
++#include <sys/sysmacros.h>
++#endif
++#include <sys/types.h>
+ 
+ 
+ #if defined(__linux__)
+@@ -59,8 +65,8 @@
+ static int DevGetPerfData1 (dev_t p_iDevice, struct devperf_t *p_poPerf)
+ 	/* Get disk performance statistics from STATISTICS_FILE_1 */
+ {
+-    const int       iMajorNo = (p_iDevice >> 8) & 0xFF, /**/
+-	iMinorNo = p_iDevice & 0xFF;
++    const int       iMajorNo = major(p_iDevice),
++	iMinorNo = minor(p_iDevice);
+     struct timeval  oTimeStamp;
+     FILE           *pF;
+     unsigned int    major, minor, rsect, wsect, ruse, wuse, use;
+@@ -153,7 +159,7 @@
+ 
+ 	/**************************************************************/
+ 
+-int DevPerfInit ()
++int DevPerfInit (void)
+ {
+     FILE           *pF = 0;
+     char            acLine[256];
+@@ -243,7 +249,7 @@
+ 
+ #define MAXNAMELEN 256
+ 
+-int DevPerfInit ()
++int DevPerfInit (void)
+ {
+ 	return (0);
+ }
+@@ -320,7 +326,7 @@
+ #include <sys/param.h>
+ #include <sys/sysctl.h>
+ 
+-int DevPerfInit ()
++int DevPerfInit (void)
+ {
+ 	return (0);
+ }
+@@ -398,7 +404,7 @@
+ #include <sys/sysctl.h>
+ #include <sys/disk.h>
+ 
+-int DevPerfInit ()
++int DevPerfInit (void)
+ {
+         return (0);
+ }
+@@ -473,7 +479,7 @@
+ #include <kstat.h>
+ static kstat_ctl_t *kc;
+ 
+-int DevPerfInit ()
++int DevPerfInit (void)
+ {
+ 	kc = kstat_open ();
+         return (0);
+--- a/panel-plugin/devperf.h
++++ b/panel-plugin/devperf.h
+@@ -46,7 +46,7 @@
+ extern          "C" {
+ #endif
+ 
+-    int             DevPerfInit ();
++    int             DevPerfInit (void);
+     /* Make required initialisations */
+     /* Return 0 on success */
+ 
+--- a/panel-plugin/main.c
++++ b/panel-plugin/main.c
+@@ -38,6 +38,7 @@
+ #include <string.h>
+ #include <errno.h>
+ #include <sys/stat.h>
++#include <stdint.h>
+ 
+ #ifdef LIBXFCE4PANEL_CHECK_VERSION
+ #if LIBXFCE4PANEL_CHECK_VERSION (4,9,0)
+@@ -85,7 +86,7 @@
+ 
+ typedef struct param_t {
+     /* Configurable parameters */
+-    char            acDevice[64];
++    char            acDevice[128];
+ #if  !defined(__FreeBSD__) && !defined(__NetBSD__) && !defined(__OpenBSD__) && !defined(__sun__)
+     dev_t           st_rdev;
+ #endif
+@@ -442,16 +443,16 @@
+     poPlugin->plugin = plugin;
+     
+ #if defined(__NetBSD__) || defined(__OpenBSD__)
+-    strncpy (poConf->acDevice, "wd0", 64);
++    strncpy (poConf->acDevice, "wd0", 128);
+     strncpy (poConf->acTitle, "wd0", 16);
+ #elif defined(__FreeBSD__)
+-    strncpy (poConf->acDevice, "ada0", 64);
++    strncpy (poConf->acDevice, "ada0", 128);
+     strncpy (poConf->acTitle, "ada0", 16);
+ #elif defined(__sun__)
+-    strncpy (poConf->acDevice, "sd0", 64);
++    strncpy (poConf->acDevice, "sd0", 128);
+     strncpy (poConf->acTitle, "sd0", 16);
+ #else
+-    strncpy (poConf->acDevice, "/dev/sda", 64);
++    strncpy (poConf->acDevice, "/dev/sda", 128);
+     status = stat (poConf->acDevice, &oStat);
+     poConf->st_rdev = (status == -1 ? 0 : oStat.st_rdev);
+     strncpy (poConf->acTitle, "sda", 16);
+@@ -804,8 +805,8 @@
+ 
+     /* Make it a multiple of 5 MB/s */
+     poConf->iMaxXferMBperSec = 5 * round((double) atoi(pcXferRate) / 5);
+-    if (poConf->iMaxXferMBperSec > 995)
+-	poConf->iMaxXferMBperSec = 995;
++    if (poConf->iMaxXferMBperSec > INT16_MAX)
++	poConf->iMaxXferMBperSec = INT16_MAX - 2;
+     else if (poConf->iMaxXferMBperSec < 5)
+ 	poConf->iMaxXferMBperSec = 5;
+     DBG("XferRate rounded to %dMb/s\n", poConf->iMaxXferMBperSec);

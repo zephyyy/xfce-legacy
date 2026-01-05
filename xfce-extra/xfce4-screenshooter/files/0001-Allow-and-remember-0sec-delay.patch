@@ -1,0 +1,47 @@
+diff --git a/lib/screenshooter-capture.c b/lib/screenshooter-capture.c
+index f4e6e92..754fd31 100644
+--- a/lib/screenshooter-capture.c
++++ b/lib/screenshooter-capture.c
+@@ -1068,7 +1068,13 @@ GdkPixbuf *screenshooter_take_screenshot (gint     region,
+ 
+   /* wait for n=delay seconds */
+   if (region != SELECT)
+-    sleep (delay);
++    {
++      /* Await the specified delay, but not less than 200ms */
++      if (delay <= 0)
++        g_usleep (200000);
++      else
++        sleep (delay);
++    }
+ 
+   /* Get the window/desktop we want to screenshot*/
+   if (region == FULLSCREEN)
+diff --git a/lib/screenshooter-dialogs.c b/lib/screenshooter-dialogs.c
+index f3c2535..8bdc2bf 100644
+--- a/lib/screenshooter-dialogs.c
++++ b/lib/screenshooter-dialogs.c
+@@ -855,7 +855,7 @@ GtkWidget *screenshooter_region_dialog_new (ScreenshotData *sd, gboolean plugin)
+   delay_spinner_box = gtk_hbox_new (FALSE, 4);
+   gtk_box_pack_start (GTK_BOX (delay_box), delay_spinner_box, FALSE, FALSE, 0);
+ 
+-  delay_spinner = gtk_spin_button_new_with_range(1.0, 60.0, 1.0);
++  delay_spinner = gtk_spin_button_new_with_range (0.0, 60.0, 1.0);
+   gtk_spin_button_set_value (GTK_SPIN_BUTTON (delay_spinner), sd->delay);
+   gtk_widget_set_tooltip_text (delay_spinner,
+                                _("Delay in seconds before the screenshot is taken"));
+diff --git a/src/main.c b/src/main.c
+index c677165..43ce6b5 100644
+--- a/src/main.c
++++ b/src/main.c
+@@ -370,10 +370,6 @@ int main (int argc, char **argv)
+     {
+       GtkWidget *dialog;
+ 
+-      /* Use 1 as the minimal delay, 0 may show corrupted windows */
+-      if (sd->delay == 0)
+-        sd->delay = 1;
+-
+       /* Set the dialog up */
+       dialog = screenshooter_region_dialog_new (sd, FALSE);
+       g_signal_connect (dialog, "response",
