@@ -42,6 +42,13 @@ RDEPEND="
 DEPEND="${COMMON_DEPEND}"
 BDEPEND="dev-build/xfce4-dev-tools"
 
+PATCHES=(
+	"${FILESDIR}/0001-Pass-VT-number-to-xinit-if-XDG_VTNR-is-set.patch"
+	"${FILESDIR}/0003-source-system-xinitrc-scripts.patch"
+	"${FILESDIR}/configurable-screenlockers.patch"
+	"${FILESDIR}/pass-xdg-env.patch"
+)
+
 REQUIRED_USE="elogind? ( policykit )
 	systemd? ( policykit )"
 

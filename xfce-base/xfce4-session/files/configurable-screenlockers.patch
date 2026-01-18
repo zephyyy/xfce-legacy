@@ -1,0 +1,24 @@
+--- a/scripts/xflock4
++++ b/scripts/xflock4
+@@ -24,14 +24,20 @@
+ PATH=/bin:/usr/bin
+ export PATH
+ 
++# First test for the command set in the session's xfconf channel
++LOCK_CMD=$(xfconf-query -c xfce4-session -p /general/LockCommand)
++
+ # Lock by xscreensaver, gnome-screensaver or light-locker, if a respective
+ # daemon is running
+ for lock_cmd in \
++    "$LOCK_CMD" \
+     "xscreensaver-command -lock" \
+     "gnome-screensaver-command --lock" \
+     "light-locker-command --lock"
+ do
+-    $lock_cmd >/dev/null 2>&1 && exit
++    if [ ! -z "$lock_cmd" ]; then
++        $lock_cmd >/dev/null 2>&1 && exit
++    fi
+ done
+ 
+ # else run another access locking utility, if installed
