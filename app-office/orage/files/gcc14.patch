@@ -1,0 +1,22 @@
+--- a/src/functions.h
++++ b/src/functions.h
+@@ -116,6 +116,8 @@
+ void orage_select_date(GtkCalendar *cal, guint year, guint month, guint day);
+ void orage_select_today(GtkCalendar *cal);
+ 
++gboolean orage_copy_file (const gchar *source, const gchar *target);
++
+ gchar *orage_data_file_location(char *dir_name);
+ gchar *orage_config_file_location(char *dir_name);
+ OrageRc *orage_rc_file_open(char *fpath, gboolean read_only);
+--- a/src/functions.c
++++ b/src/functions.c
+@@ -867,7 +867,7 @@
+  * data and config file locations
+  *******************************************************/
+ 
+-gboolean orage_copy_file(gchar *source, gchar *target)
++gboolean orage_copy_file (const gchar *source, const gchar *target)
+ {
+     gchar *text;
+     gsize text_len;
