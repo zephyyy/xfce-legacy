@@ -3,7 +3,7 @@
 
 EAPI=8
 
-inherit xdg-utils
+inherit xdg-utils gnome2-utils
 
 DESCRIPTION="Engrampa archive manager for MATE"
 HOMEPAGE="https://mate-desktop.org"
@@ -39,6 +39,7 @@ PATCHES=(
 	"${FILESDIR}/Remove-unused-g_ptr_array_copy.patch"
 	"${FILESDIR}/Add-zcompress-support.patch"
 	"${FILESDIR}/Zstandard-read-.tar.zst-files.patch"
+	"${FILESDIR}/gcc10.patch"
 )
 
 src_prepare() {
@@ -59,9 +60,11 @@ src_configure() {
 pkg_postinst() {
 	xdg_icon_cache_update
 	xdg_desktop_database_update
+	gnome2_schemas_update
 }
 
 pkg_postrm() {
 	xdg_icon_cache_update
 	xdg_desktop_database_update
+	gnome2_schemas_update
 }

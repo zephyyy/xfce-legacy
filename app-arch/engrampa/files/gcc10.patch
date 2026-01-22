@@ -1,0 +1,12 @@
+--- a/src/main.c
++++ b/src/main.c
+@@ -33,9 +33,6 @@
+ 
+ #include "fr-init.h"
+ 
+-GList        *WindowList = NULL;
+-gint          ForceDirectoryCreation;
+-
+ static char **remaining_args;
+ static char  *add_to = NULL;
+ static int    add;
