@@ -1,0 +1,11 @@
+--- a/mousepad/mousepad-dbus.c
++++ b/mousepad/mousepad-dbus.c
+@@ -257,7 +257,7 @@
+   if (proxy)
+     {
+      succeed = mousepad_dbus_service_call_launch_files_sync (
+-        proxy, utf8_dir, utf8_filenames->pdata, NULL, error);
++        proxy, utf8_dir, (const gchar *const *) utf8_filenames->pdata, NULL, error);
+ 
+       g_object_unref (proxy);
+     }

@@ -32,6 +32,7 @@ BDEPEND="
 
 PATCHES=(
 	"${FILESDIR}/bug15755.patch"
+	"${FILESDIR}/gcc14.patch"
 )
 
 src_configure() {
@@ -41,6 +42,11 @@ src_configure() {
 		)
 
 	econf "${myconf[@]}"
+}
+
+src_install() {
+	default
+	find "${D}" -name '*.la' -delete || die
 }
 
 pkg_postinst() {
