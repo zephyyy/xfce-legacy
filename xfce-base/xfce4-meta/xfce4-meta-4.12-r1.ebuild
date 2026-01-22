@@ -20,7 +20,7 @@ RDEPEND="
 	<xfce-base/exo-0.12.12
 	<xfce-base/garcon-0.7.1
 	<xfce-base/libxfce4ui-4.13.0
-	<xfce-base/libxfce4util-4.13.0
+	<xfce-base/libxfce4util-4.15.0
 	<xfce-base/thunar-1.7.0
 	<xfce-base/thunar-volman-0.9.0
 	<xfce-base/tumbler-4.13.0

@@ -28,6 +28,7 @@ BDEPEND="${RDEPEND}
 src_prepare() {
 	# stupid vala.eclass...
 	default
+	sed 's/\\"4\.14\\"/\\"4.12\\"/g' -i configure
 }
 
 src_configure() {
