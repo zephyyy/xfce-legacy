@@ -1,0 +1,332 @@
+From c4c5afe752cafba87994a74253d1d1bdc5517471 Mon Sep 17 00:00:00 2001
+From: Svetlana Akaeva <erikazoku@caramail.com>
+Date: Sat, 24 Jan 2026 16:50:40 +0300
+Subject: [PATCH 6/8] Clean up and resolve warnings
+
+---
+ panel-plugin/xfce4-cpufreq-linux-procfs.c | 11 ++---
+ panel-plugin/xfce4-cpufreq-linux-pstate.c | 17 ++++---
+ panel-plugin/xfce4-cpufreq-linux-sysfs.c  | 57 +++++++++++++----------
+ panel-plugin/xfce4-cpufreq-linux-sysfs.h  |  2 +-
+ panel-plugin/xfce4-cpufreq-linux.c        |  6 +--
+ 5 files changed, 49 insertions(+), 44 deletions(-)
+
+diff --git a/panel-plugin/xfce4-cpufreq-linux-procfs.c b/panel-plugin/xfce4-cpufreq-linux-procfs.c
+index 89e90db..87cb34c 100644
+--- a/panel-plugin/xfce4-cpufreq-linux-procfs.c
++++ b/panel-plugin/xfce4-cpufreq-linux-procfs.c
+@@ -34,7 +34,7 @@
+ 
+ 
+ gboolean
+-cpufreq_procfs_is_available ()
++cpufreq_procfs_is_available (void)
+ {
+   return g_file_test (PROCFS_BASE, G_FILE_TEST_EXISTS);
+ }
+@@ -42,12 +42,12 @@ cpufreq_procfs_is_available ()
+ 
+ 
+ gboolean
+-cpufreq_procfs_read_cpuinfo ()
++cpufreq_procfs_read_cpuinfo (void)
+ {
+   CpuInfo *cpu;
+   FILE *file;
+   gchar *freq, *filePath, *fileContent;
+-  gint i = 0;
++  guint i = 0;
+   gboolean add_cpu;
+ 
+   filePath = g_strdup ("/proc/cpuinfo");
+@@ -114,11 +114,10 @@ cpufreq_procfs_read_cpuinfo ()
+ 
+ 
+ gboolean
+-cpufreq_procfs_read ()
++cpufreq_procfs_read (void)
+ {
+   CpuInfo *cpu;
+   FILE *file;
+-  gint i;
+   gchar *filePath, *fileContent;
+ 
+   filePath = g_strdup (PROCFS_BASE);
+@@ -162,7 +161,7 @@ cpufreq_procfs_read ()
+ 
+   g_free (filePath);
+ 
+-  for (i = 0; i < cpuFreq->cpus->len; i++)
++  for (guint i = 0; i < cpuFreq->cpus->len; i++)
+   {
+     cpu = g_ptr_array_index (cpuFreq->cpus, i);
+     filePath = g_strdup_printf ("/proc/sys/cpu/%d/speed", i);
+diff --git a/panel-plugin/xfce4-cpufreq-linux-pstate.c b/panel-plugin/xfce4-cpufreq-linux-pstate.c
+index 7b5f685..7b99b84 100644
+--- a/panel-plugin/xfce4-cpufreq-linux-pstate.c
++++ b/panel-plugin/xfce4-cpufreq-linux-pstate.c
+@@ -34,8 +34,10 @@
+ 
+ static gboolean read_params ();
+ 
++
++
+ gboolean
+-cpufreq_pstate_is_available ()
++cpufreq_pstate_is_available (void)
+ {
+   return g_file_test (PSTATE_BASE, G_FILE_TEST_EXISTS);
+ }
+@@ -45,9 +47,6 @@ cpufreq_pstate_is_available ()
+ gboolean
+ cpufreq_pstate_read (void)
+ {
+-  CpuInfo *cpu;
+-  gint i;
+-
+   /* gather intel pstate parameters */
+   if (!read_params ())
+     return FALSE;
+@@ -63,9 +62,9 @@ cpufreq_pstate_read (void)
+ 
+ 
+ static gboolean
+-read_params ()
++read_params (void)
+ {
+-  gchar *file, *contents;
++  gchar *file;
+   IntelPState *ips;
+ 
+   ips = g_slice_new0(IntelPState);
+@@ -74,15 +73,15 @@ read_params ()
+     return FALSE;
+ 
+   file = g_strdup (PSTATE_BASE "/min_perf_pct");
+-  cpufreq_sysfs_read_int (file, contents, &ips->min_perf_pct);
++  cpufreq_sysfs_read_int (file, &ips->min_perf_pct);
+   g_free (file);
+ 
+   file = g_strdup (PSTATE_BASE "/max_perf_pct");
+-  cpufreq_sysfs_read_int (file, contents, &ips->max_perf_pct);
++  cpufreq_sysfs_read_int (file, &ips->max_perf_pct);
+   g_free (file);
+ 
+   file = g_strdup (PSTATE_BASE "/no_turbo");
+-  cpufreq_sysfs_read_int (file, contents, &ips->no_turbo);
++  cpufreq_sysfs_read_int (file, &ips->no_turbo);
+   g_free (file);
+ 
+   g_slice_free (IntelPState, cpuFreq->intel_pstate);
+diff --git a/panel-plugin/xfce4-cpufreq-linux-sysfs.c b/panel-plugin/xfce4-cpufreq-linux-sysfs.c
+index 92b89ac..98f1011 100644
+--- a/panel-plugin/xfce4-cpufreq-linux-sysfs.c
++++ b/panel-plugin/xfce4-cpufreq-linux-sysfs.c
+@@ -31,11 +31,11 @@
+ 
+ #define SYSFS_BASE  "/sys/devices/system/cpu"
+ 
+-static void cpufreq_sysfs_read_int_list (gchar *file, gchar *contents, GList **list);
++static void cpufreq_sysfs_read_int_list (gchar *file, GList **list);
+ 
+-static void cpufreq_sysfs_read_string (gchar *file, gchar *contents, gchar **string);
++static void cpufreq_sysfs_read_string (gchar *file, gchar **string);
+ 
+-static void cpufreq_sysfs_read_string_list (gchar *file, gchar *contents, GList **list);
++static void cpufreq_sysfs_read_string_list (gchar *file, GList **list);
+ 
+ static void parse_sysfs_init (gint cpu_number, CpuInfo *cpu);
+ 
+@@ -46,27 +46,29 @@ static inline gboolean cpufreq_cpu_exists (gint num);
+ 
+ 
+ gboolean
+-cpufreq_sysfs_is_available ()
++cpufreq_sysfs_is_available (void)
+ {
+   return g_file_test (SYSFS_BASE"/cpu0/cpufreq", G_FILE_TEST_EXISTS);
+ }
+ 
++
++
+ void
+ cpufreq_sysfs_read_current (gint cpu_number)
+ {
+   CpuInfo *cpu;
+-  gchar	*file, *contents;
++  gchar	*file;
+ 
+   cpu = g_ptr_array_index (cpuFreq->cpus, cpu_number);
+ 
+   /* read current cpu freq */
+   file = g_strdup_printf (SYSFS_BASE"/cpu%i/cpufreq/scaling_cur_freq", cpu_number);
+-  cpufreq_sysfs_read_int (file, contents, &cpu->cur_freq);
++  cpufreq_sysfs_read_int (file, &cpu->cur_freq);
+   g_free (file);
+ 
+   /* read current cpu governor */
+   file = g_strdup_printf (SYSFS_BASE"/cpu%i/cpufreq/scaling_governor", cpu_number);
+-  cpufreq_sysfs_read_string (file, contents, &cpu->cur_governor);
++  cpufreq_sysfs_read_string (file, &cpu->cur_governor);
+   g_free (file);
+ }
+ 
+@@ -76,7 +78,6 @@ gboolean
+ cpufreq_sysfs_read (void)
+ {
+   gint count = 0, i = 0;
+-  gchar *file;
+ 
+   while (cpufreq_cpu_exists (count))
+     count++;
+@@ -93,9 +94,11 @@ cpufreq_sysfs_read (void)
+ 
+ 
+ void
+-cpufreq_sysfs_read_int (gchar *file, gchar *contents, gint *intval)
++cpufreq_sysfs_read_int (gchar *file, guint *intval)
+ {
+-  if (contents = read_file_contents (file)) {
++  gchar *contents = read_file_contents (file);
++
++  if (contents) {
+     (*intval) = atoi (contents);
+     g_free (contents);
+   }
+@@ -104,9 +107,11 @@ cpufreq_sysfs_read_int (gchar *file, gchar *contents, gint *intval)
+ 
+ 
+ static void
+-cpufreq_sysfs_read_int_list (gchar *file, gchar *contents, GList **list)
++cpufreq_sysfs_read_int_list (gchar *file, GList **list)
+ {
+-  if (contents = read_file_contents (file)) {
++  gchar *contents = read_file_contents (file);
++
++  if (contents) {
+     gchar **tokens = NULL;
+     gint i = 0;
+     tokens = g_strsplit (contents, " ", 0);
+@@ -123,9 +128,11 @@ cpufreq_sysfs_read_int_list (gchar *file, gchar *contents, GList **list)
+ 
+ 
+ static void
+-cpufreq_sysfs_read_string (gchar *file,gchar *contents, gchar **string)
++cpufreq_sysfs_read_string (gchar *file, gchar **string)
+ {
+-  if (contents = read_file_contents (file)) {
++  gchar *contents = read_file_contents (file);
++
++  if (contents) {
+     g_free (*string);
+     *string = contents;
+   }
+@@ -134,9 +141,11 @@ cpufreq_sysfs_read_string (gchar *file,gchar *contents, gchar **string)
+ 
+ 
+ static void
+-cpufreq_sysfs_read_string_list (gchar *file, gchar *contents, GList **list)
++cpufreq_sysfs_read_string_list (gchar *file, GList **list)
+ {
+-  if (contents = read_file_contents (file)) {
++  gchar *contents = read_file_contents (file);
++
++  if (contents) {
+     gchar **tokens = NULL;
+     gint i = 0;
+     tokens = g_strsplit (contents, " ", 0);
+@@ -155,7 +164,7 @@ cpufreq_sysfs_read_string_list (gchar *file, gchar *contents, GList **list)
+ static void
+ parse_sysfs_init (gint cpu_number, CpuInfo *cpu)
+ {
+-  gchar *file, *contents;
++  gchar *file;
+   gboolean add_cpu = FALSE;
+ 
+   if (cpu == NULL) {
+@@ -166,38 +175,38 @@ parse_sysfs_init (gint cpu_number, CpuInfo *cpu)
+   /* read available cpu freqs */
+   if (cpuFreq->intel_pstate == NULL) {
+     file = g_strdup_printf (SYSFS_BASE"/cpu%i/cpufreq/scaling_available_frequencies", cpu_number);
+-    cpufreq_sysfs_read_int_list (file, contents, &cpu->available_freqs);
++    cpufreq_sysfs_read_int_list (file, &cpu->available_freqs);
+     g_free (file);
+   }
+ 
+   /* read available cpu governors */
+   file = g_strdup_printf (SYSFS_BASE"/cpu%i/cpufreq/scaling_available_governors", cpu_number);
+-  cpufreq_sysfs_read_string_list (file, contents, &cpu->available_governors);
++  cpufreq_sysfs_read_string_list (file, &cpu->available_governors);
+   g_free (file);
+ 
+   /* read cpu driver */
+   file = g_strdup_printf (SYSFS_BASE"/cpu%i/cpufreq/scaling_driver", cpu_number);
+-  cpufreq_sysfs_read_string (file, contents, &cpu->scaling_driver);
++  cpufreq_sysfs_read_string (file, &cpu->scaling_driver);
+   g_free (file);
+ 
+   /* read current cpu freq */
+   file = g_strdup_printf (SYSFS_BASE"/cpu%i/cpufreq/scaling_cur_freq", cpu_number);
+-  cpufreq_sysfs_read_int (file, contents, &cpu->cur_freq);
++  cpufreq_sysfs_read_int (file, &cpu->cur_freq);
+   g_free (file);
+ 
+   /* read current cpu governor */
+   file = g_strdup_printf (SYSFS_BASE"/cpu%i/cpufreq/scaling_governor", cpu_number);
+-  cpufreq_sysfs_read_string (file, contents, &cpu->cur_governor);
++  cpufreq_sysfs_read_string (file, &cpu->cur_governor);
+   g_free (file);
+ 
+   /* read max cpu freq */
+   file = g_strdup_printf (SYSFS_BASE"/cpu%i/cpufreq/scaling_max_freq", cpu_number);
+-  cpufreq_sysfs_read_int (file, contents, &cpu->max_freq);
++  cpufreq_sysfs_read_int (file, &cpu->max_freq);
+   g_free (file);
+ 
+   /* read min cpu freq */
+   file = g_strdup_printf (SYSFS_BASE"/cpu%i/cpufreq/scaling_min_freq", cpu_number);
+-  cpufreq_sysfs_read_int (file, contents, &cpu->min_freq);
++  cpufreq_sysfs_read_int (file, &cpu->min_freq);
+   g_free (file);
+ 
+   if (add_cpu)
+diff --git a/panel-plugin/xfce4-cpufreq-linux-sysfs.h b/panel-plugin/xfce4-cpufreq-linux-sysfs.h
+index 068c0d0..2749ef4 100644
+--- a/panel-plugin/xfce4-cpufreq-linux-sysfs.h
++++ b/panel-plugin/xfce4-cpufreq-linux-sysfs.h
+@@ -28,7 +28,7 @@ gboolean cpufreq_sysfs_read (void);
+ 
+ void cpufreq_sysfs_read_current (gint cpu_number);
+ 
+-void cpufreq_sysfs_read_int (gchar *file, gchar *contents, gint *intval);
++void cpufreq_sysfs_read_int (gchar *file, guint *intval);
+ 
+ G_END_DECLS
+ 
+diff --git a/panel-plugin/xfce4-cpufreq-linux.c b/panel-plugin/xfce4-cpufreq-linux.c
+index a50d27f..ed97bed 100644
+--- a/panel-plugin/xfce4-cpufreq-linux.c
++++ b/panel-plugin/xfce4-cpufreq-linux.c
+@@ -87,17 +87,15 @@ cpufreq_linux_init (void)
+ gboolean
+ cpufreq_update_cpus (gpointer data)
+ {
+-  gint i;
+-
+   if (cpufreq_sysfs_is_available ())
+   {
+-    for (i = 0; i < cpuFreq->cpus->len; i++)
++    for (guint i = 0; i < cpuFreq->cpus->len; i++)
+       cpufreq_sysfs_read_current (i);
+   }
+   else if (cpufreq_procfs_is_available ())
+   {
+     /* First we delete the cpus and then read the /proc/cpufreq file again */
+-    for (i = 0; i < cpuFreq->cpus->len; i++)
++    for (guint i = 0; i < cpuFreq->cpus->len; i++)
+     {
+       CpuInfo *cpu = g_ptr_array_index (cpuFreq->cpus, i);
+       g_ptr_array_remove_fast (cpuFreq->cpus, cpu);
+-- 
+2.45.2
+

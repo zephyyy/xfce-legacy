@@ -10,7 +10,7 @@ SRC_URI="https://archive.xfce.org/src/panel-plugins/${PN}/${PV%.*}/${P}.tar.bz2"
 
 LICENSE="GPL-2"
 SLOT="0"
-KEYWORDS="amd64 ~arm ~arm64 ppc ppc64 ~riscv x86"
+KEYWORDS="amd64 arm arm64 ppc ppc64 riscv x86"
 
 RDEPEND="
 	>=dev-libs/glib-2.20:=
@@ -27,6 +27,23 @@ BDEPEND="
 	sys-devel/gettext
 	virtual/pkgconfig
 "
+
+PATCHES=(
+	"${FILESDIR}/0001-Fix-compilation-warn.patch"
+	"${FILESDIR}/0002-Drop-Intel-p-state-Bug-13835.patch"
+	"${FILESDIR}/0003-Prefer-sysfs-to-Intel-pstate-in-cpufreq_linux_init-B.patch"
+	"${FILESDIR}/0004-Format-xfce4-cpufreq-linux.c.patch"
+	"${FILESDIR}/0005-Refactor-split-cpufreq-linux.c.patch"
+	"${FILESDIR}/0006-Clean-up-and-resolve-warnings.patch"
+	"${FILESDIR}/0007-Check-if-each-cpu-is-online-Bug-14641.patch"
+	"${FILESDIR}/0008-Fix-compilation-with-gcc-10.patch"
+)
+
+src_prepare() {
+	default
+	mkdir m4
+	NOCONFIGURE=1 xdt-autogen
+}
 
 src_install() {
 	default

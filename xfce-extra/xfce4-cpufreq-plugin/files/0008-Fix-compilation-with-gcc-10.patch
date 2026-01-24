@@ -1,0 +1,40 @@
+From 45c9c5708685cc17e0dc412e6bb8ca2b4b5b2143 Mon Sep 17 00:00:00 2001
+From: Romain Bouvier <skunnyk@alteroot.org>
+Date: Thu, 11 Jun 2020 18:28:14 +0200
+Subject: [PATCH] Fix compilation with gcc-10
+
+- Resolv #6
+---
+ panel-plugin/xfce4-cpufreq-plugin.c | 2 ++
+ panel-plugin/xfce4-cpufreq-plugin.h | 2 +-
+ 2 files changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/panel-plugin/xfce4-cpufreq-plugin.c b/panel-plugin/xfce4-cpufreq-plugin.c
+index f758486..7f94952 100644
+--- a/panel-plugin/xfce4-cpufreq-plugin.c
++++ b/panel-plugin/xfce4-cpufreq-plugin.c
+@@ -41,6 +41,8 @@
+ #include "xfce4-cpufreq-overview.h"
+ #include "xfce4-cpufreq-utils.h"
+ 
++CpuFreqPlugin *cpuFreq;
++
+ 
+ CpuInfo *
+ cpufreq_cpus_calc_min (void)
+diff --git a/panel-plugin/xfce4-cpufreq-plugin.h b/panel-plugin/xfce4-cpufreq-plugin.h
+index 4e9d189..2f291f2 100644
+--- a/panel-plugin/xfce4-cpufreq-plugin.h
++++ b/panel-plugin/xfce4-cpufreq-plugin.h
+@@ -92,7 +92,7 @@ typedef struct
+ 	gint 		      timeoutHandle;
+ } CpuFreqPlugin;
+ 
+-CpuFreqPlugin *cpuFreq;
++extern CpuFreqPlugin *cpuFreq;
+ 
+ G_BEGIN_DECLS
+ 
+-- 
+2.45.2
+
