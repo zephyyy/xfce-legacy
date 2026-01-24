@@ -12,19 +12,27 @@ SLOT="0"
 KEYWORDS="~alpha amd64 ~arm arm64 ~hppa ~ia64 ~mips ~ppc ppc64 ~sparc x86"
 IUSE=""
 
-RDEPEND=">=dev-libs/glib-2.30:=
+RDEPEND="
+	>=dev-libs/glib-2.30:=
 	>=x11-libs/gtk+-2.24:2=
 	>=xfce-base/garcon-0.3:=
 	>=xfce-base/libxfce4util-4.11:=
 	>=xfce-base/libxfce4ui-4.11:=
 	>=xfce-base/xfconf-4.10:=
-	!xfce-base/xfce-utils"
-BDEPEND="${RDEPEND}
+	!xfce-base/xfce-utils
+"
+BDEPEND="
 	dev-util/intltool
 	sys-devel/gettext
-	virtual/pkgconfig"
+	virtual/pkgconfig
+"
 
 PATCHES=(
 	"${FILESDIR}/0001-Use-non-legacy-icon-names.patch"
 	"${FILESDIR}/gcc14.patch"
 )
+
+src_prepare() {
+	default
+	sed -i data/Makefile.* -e 's,/appdata,/metainfo,'
+}

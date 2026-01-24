@@ -35,6 +35,11 @@ BDEPEND="
 	x11-base/xorg-proto
 "
 
+src_prepare() {
+	default
+	sed -i data/appdata/Makefile.* -e 's,/appdata,/metainfo,'
+}
+
 src_configure() {
 	local myconf=(
 		$(use_enable qrcode libqrencode)

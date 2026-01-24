@@ -40,6 +40,11 @@ PATCHES=(
 	"${FILESDIR}/gcc14.patch"
 )
 
+src_prepare() {
+	default
+	sed -i Makefile.* -e 's,/appdata,/metainfo,'
+}
+
 src_configure() {
 	local myconf=(
 		$(use_enable udev gudev)
