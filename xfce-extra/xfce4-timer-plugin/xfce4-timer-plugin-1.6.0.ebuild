@@ -25,6 +25,10 @@ BDEPEND="
 	virtual/pkgconfig
 "
 
+PATCHES=(
+	"${FILESDIR}/gcc14.patch"
+)
+
 src_configure() {
 	econf --libexecdir="${EPREFIX}"/usr/$(get_libdir)
 }
