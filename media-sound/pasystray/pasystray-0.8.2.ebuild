@@ -12,7 +12,7 @@ SRC_URI="https://github.com/christophgysin/${PN}/archive/refs/tags/${PV}.tar.gz 
 LICENSE="LGPL-2.1+"
 SLOT="0"
 KEYWORDS="amd64 arm64 ppc64 arm x86"
-IUSE="libnotify zeroconf gtk2"
+IUSE="libnotify zeroconf gtk3"
 
 RDEPEND="
 	dev-libs/glib
@@ -20,8 +20,8 @@ RDEPEND="
 		media-libs/libpulse[glib]
 		media-sound/pulseaudio-daemon[glib,zeroconf?]
 	)
-	!gtk2? ( x11-libs/gtk+:3 )
-	gtk2? ( x11-libs/gtk+:2 )
+	gtk3? ( x11-libs/gtk+:3 )
+	!gtk3? ( x11-libs/gtk+:2 )
 	x11-libs/libX11
 	zeroconf? ( net-dns/avahi )
 	libnotify? ( x11-libs/libnotify )
@@ -38,7 +38,7 @@ src_prepare() {
 
 src_configure() {
 	econf \
-		$(use_with gtk2 gtk=2) \
+		--with-gtk=$(usex gtk3 3 2) \
 		$(use_enable libnotify notify) \
 		$(use_enable zeroconf avahi)
 }
