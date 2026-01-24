@@ -51,3 +51,8 @@ src_configure() {
 		$(use_enable accountsservice) \
 		$(use_enable introspection)
 }
+
+src_install() {
+	default
+	find "${ED}" -name '*.la' -delete || die
+}
