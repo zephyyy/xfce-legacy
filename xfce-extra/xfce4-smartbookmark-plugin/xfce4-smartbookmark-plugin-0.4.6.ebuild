@@ -29,6 +29,7 @@ BDEPEND="
 "
 
 src_prepare() {
+	default
 	sed -i -e '/bugs/s:debian:gentoo:' src/smartbookmark.c || die
 }
 
