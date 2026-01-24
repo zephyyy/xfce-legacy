@@ -1,0 +1,166 @@
+--- a/libxfcegui4/xfce_aboutdialog.c
++++ b/libxfcegui4/xfce_aboutdialog.c
+@@ -921,7 +921,7 @@
+   dialog->priv = priv;
+ 
+   /* remove the main dialog box from the window */
+-  g_object_ref (G_OBJECT (GTK_DIALOG (dialog)->vbox));
++  g_object_ref (GTK_DIALOG (dialog)->vbox);
+   gtk_container_remove (GTK_CONTAINER (dialog), GTK_DIALOG (dialog)->vbox);
+ 
+   /* add a new vbox w/o border to the main window */
+@@ -957,7 +957,7 @@
+    * allocate tooltips
+    */
+   priv->tooltips = gtk_tooltips_new();
+-  g_object_ref(G_OBJECT(priv->tooltips));
++  g_object_ref(priv->tooltips);
+   gtk_object_sink(GTK_OBJECT(priv->tooltips));
+ 
+   /*
+@@ -1236,7 +1236,7 @@
+   if (G_UNLIKELY (dialog->priv->pixbuf != NULL))
+     g_object_unref (G_OBJECT (dialog->priv->pixbuf));
+   if (G_LIKELY (icon != NULL))
+-    dialog->priv->pixbuf = g_object_ref (G_OBJECT (icon));
++    dialog->priv->pixbuf = g_object_ref (icon);
+   xfce_about_dialog_update_info_icon (dialog);
+ }
+ 
+--- a/libxfcegui4/netk-class-group.c
++++ b/libxfcegui4/netk-class-group.c
+@@ -413,8 +413,8 @@
+     if (class_group->priv->mini_icon)
+         g_object_unref (G_OBJECT (class_group->priv->mini_icon));
+ 
+-    class_group->priv->icon = g_object_ref (G_OBJECT (icon));
+-    class_group->priv->mini_icon = g_object_ref (G_OBJECT (mini_icon));
++    class_group->priv->icon = g_object_ref (icon);
++    class_group->priv->mini_icon = g_object_ref (mini_icon);
+ 
+     g_signal_emit (G_OBJECT (class_group), signals[ICON_CHANGED], 0);
+ }
+--- a/libxfcegui4/netk-tasklist.c
++++ b/libxfcegui4/netk-tasklist.c
+@@ -1232,7 +1232,7 @@
+     tasklist = g_object_new (NETK_TYPE_TASKLIST, NULL);
+ 
+     tasklist->priv->tooltips = gtk_tooltips_new ();
+-    g_object_ref (G_OBJECT (tasklist->priv->tooltips));
++    g_object_ref (tasklist->priv->tooltips);
+     gtk_object_sink (GTK_OBJECT (tasklist->priv->tooltips));
+ 
+     netk_tasklist_set_screen (tasklist, screen);
+@@ -1923,7 +1923,7 @@
+     }
+ 
+     if (orig == pixbuf)
+-        g_object_ref (G_OBJECT (pixbuf));
++        g_object_ref (pixbuf);
+ 
+     return pixbuf;
+ }
+@@ -2532,8 +2532,8 @@
+     task = g_object_new (NETK_TYPE_TASK, NULL);
+ 
+     task->type = NETK_TASK_WINDOW;
+-    task->window = g_object_ref (G_OBJECT (window));
+-    task->class_group = g_object_ref (G_OBJECT (netk_window_get_class_group (window)));
++    task->window = g_object_ref (window);
++    task->class_group = g_object_ref (netk_window_get_class_group (window));
+     task->tasklist = tasklist;
+     task->blink_timeout_id = 0;
+ 
+@@ -2556,7 +2556,7 @@
+     task = g_object_new (NETK_TYPE_TASK, NULL);
+ 
+     task->type = NETK_TASK_CLASS_GROUP;
+-    task->class_group = g_object_ref (G_OBJECT (class_group));
++    task->class_group = g_object_ref (class_group);
+     task->window = NULL;
+     task->tasklist = tasklist;
+     task->blink_timeout_id = 0;
+--- a/libxfcegui4/netk-window.c
++++ b/libxfcegui4/netk-window.c
+@@ -1400,7 +1400,7 @@
+     g_return_if_fail (app == NULL || NETK_IS_APPLICATION (app));
+ 
+     if (app)
+-        g_object_ref (G_OBJECT (app));
++        g_object_ref (app);
+     if (window->priv->app)
+         g_object_unref (G_OBJECT (window->priv->app));
+     window->priv->app = app;
+@@ -1414,7 +1414,7 @@
+     g_return_if_fail (class_group == NULL || NETK_IS_CLASS_GROUP (class_group));
+ 
+     if (class_group)
+-        g_object_ref (G_OBJECT (class_group));
++        g_object_ref (class_group);
+ 
+     if (window->priv->class_group)
+         g_object_unref (G_OBJECT (window->priv->class_group));
+--- a/libxfcegui4/netk-xutils.c
++++ b/libxfcegui4/netk-xutils.c
+@@ -1476,7 +1476,7 @@
+     
+     cmap = gdk_drawable_get_colormap (pixmap);
+     if (cmap)
+-        g_object_ref (G_OBJECT (cmap));
++        g_object_ref (cmap);
+ 
+     if (cmap == NULL)
+     {
+@@ -1489,7 +1489,7 @@
+         {
+             /* Try system cmap */
+             cmap = gdk_colormap_get_system ();
+-            g_object_ref (G_OBJECT (cmap));
++            g_object_ref (cmap);
+         }
+     }
+ 
+@@ -1518,7 +1518,7 @@
+     drawable = gdk_xid_table_lookup (xpixmap);
+ 
+     if (drawable)
+-        g_object_ref (G_OBJECT (drawable));
++        g_object_ref (drawable);
+     else
+         drawable = gdk_pixmap_foreign_new (xpixmap);
+         
+@@ -1793,12 +1793,12 @@
+     icon_cache->origin = origin;
+ 
+     if (new_icon)
+-        g_object_ref (G_OBJECT (new_icon));
++        g_object_ref (new_icon);
+ 
+     icon_cache->icon = new_icon;
+ 
+     if (new_mini_icon)
+-        g_object_ref (G_OBJECT (new_mini_icon));
++        g_object_ref (new_mini_icon);
+ 
+     icon_cache->mini_icon = new_mini_icon;
+ }
+--- a/libxfcegui4/xfce-heading.c
++++ b/libxfcegui4/xfce-heading.c
+@@ -495,7 +495,7 @@
+   if (G_UNLIKELY (heading->priv->icon != NULL))
+     {
+       /* just use the specified icon */
+-      pixbuf = g_object_ref (G_OBJECT (heading->priv->icon));
++      pixbuf = g_object_ref (heading->priv->icon);
+     }
+   else if (G_LIKELY (heading->priv->icon_name != NULL))
+     {
+@@ -582,7 +582,7 @@
+ 
+       /* connect to the new icon */
+       if (G_LIKELY (icon != NULL))
+-        g_object_ref (G_OBJECT (icon));
++        g_object_ref (icon);
+ 
+       /* schedule a resize */
+       gtk_widget_queue_resize (GTK_WIDGET (heading));
