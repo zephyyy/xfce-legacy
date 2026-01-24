@@ -10,7 +10,7 @@ SRC_URI="https://archive.xfce.org/src/apps/${PN}/${PV%.*}/${P}.tar.bz2"
 
 LICENSE="GPL-3"
 SLOT="0"
-KEYWORDS="amd64 x86"
+KEYWORDS="amd64 ppc64 arm64 arm x86"
 IUSE="libnotify"
 
 RDEPEND="
