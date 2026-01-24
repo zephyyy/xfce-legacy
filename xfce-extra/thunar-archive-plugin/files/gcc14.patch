@@ -1,0 +1,11 @@
+--- a/thunar-archive-plugin/tap-backend.c
++++ b/thunar-archive-plugin/tap-backend.c
+@@ -315,7 +315,7 @@
+       if (G_LIKELY (lp == NULL))
+         {
+           /* use the first available archive manager */
+-          mime_application = g_object_ref (G_OBJECT (mime_applications->data));
++          mime_application = G_APP_INFO (g_object_ref (G_OBJECT (mime_applications->data)));
+         }
+       else
+         {

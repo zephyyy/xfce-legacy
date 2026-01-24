@@ -33,12 +33,12 @@ PATCHES=(
 	"${FILESDIR}/0.3.1-fix-kde-ark.patch"
 	"${FILESDIR}/0.3.1-add-support-symlinks.patch"
 	"${FILESDIR}/zstd-support.patch"
+	"${FILESDIR}/gcc14.patch"
 )
 DOCS=( AUTHORS ChangeLog NEWS README THANKS )
 
 src_prepare() {
 	default
-	local AT_M4DIR=${EPREFIX}/usr/share/xfce4/dev-tools/m4macros
 	eautoreconf
 }
 
