@@ -1,0 +1,30 @@
+--- a/lib/hypertextview.c
++++ b/lib/hypertextview.c
+@@ -84,7 +84,7 @@
+ static gboolean _xnp_hypertext_view_button_release_event_cb_gtk_widget_button_release_event (GtkWidget* _sender, GdkEventButton* event, gpointer self);
+ static gboolean xnp_hypertext_view_motion_notify_event_cb (XnpHypertextView* self, GtkWidget* hypertextview, GdkEventMotion* event);
+ static gboolean _xnp_hypertext_view_motion_notify_event_cb_gtk_widget_motion_notify_event (GtkWidget* _sender, GdkEventMotion* event, gpointer self);
+-static void xnp_hypertext_view_move_cursor_cb (XnpHypertextView* self, GtkWidget* hypertextview, GtkMovementStep step, gint count, gboolean extend_selection);
++static void xnp_hypertext_view_move_cursor_cb (XnpHypertextView* self, GtkTextView* hypertextview, GtkMovementStep step, gint count, gboolean extend_selection);
+ static void _xnp_hypertext_view_move_cursor_cb_gtk_text_view_move_cursor (GtkTextView* _sender, GtkMovementStep step, gint count, gboolean extend_selection, gpointer self);
+ static void xnp_hypertext_view_buffer_changed_cb (XnpHypertextView* self);
+ static void _xnp_hypertext_view_buffer_changed_cb_gtk_text_buffer_changed (GtkTextBuffer* _sender, gpointer self);
+@@ -514,7 +514,7 @@
+  *
+  * Destroys existing timeouts and executes the actions immediately.
+  */
+-static void xnp_hypertext_view_move_cursor_cb (XnpHypertextView* self, GtkWidget* hypertextview, GtkMovementStep step, gint count, gboolean extend_selection) {
++static void xnp_hypertext_view_move_cursor_cb (XnpHypertextView* self, GtkTextView* hypertextview, GtkMovementStep step, gint count, gboolean extend_selection) {
+ 	guint _tmp0_;
+ 	guint _tmp6_;
+ 	g_return_if_fail (self != NULL);
+--- a/lib/theme-gtkrc.h
++++ b/lib/theme-gtkrc.h
+@@ -24,6 +24,7 @@
+ #include <gdk/gdk.h>
+ 
+ void                     xnp_theme_update_gtkrc         (const GdkColor color);
++void                     update_gtkrc                   (const GdkColor *color);
+ 
+ #endif
+ 

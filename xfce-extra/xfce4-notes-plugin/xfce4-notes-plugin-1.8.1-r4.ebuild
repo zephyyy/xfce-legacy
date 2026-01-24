@@ -26,6 +26,10 @@ BDEPEND="
 	virtual/pkgconfig
 	dev-util/intltool"
 
+PATCHES=(
+	"${FILESDIR}/gcc14.patch"
+)
+
 src_install() {
 	default
 	find "${D}" -name '*.la' -delete || die
