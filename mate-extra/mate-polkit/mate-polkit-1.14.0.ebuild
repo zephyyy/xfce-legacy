@@ -9,7 +9,7 @@ SRC_URI="https://pub.mate-desktop.org/releases/${PV%.*}/${P}.tar.xz"
 
 LICENSE="LGPL-2"
 SLOT="0"
-KEYWORDS="amd64 arm x86 ~ppc64"
+KEYWORDS="amd64 arm x86 ppc64"
 
 IUSE="accountsservice gtk3 +introspection"
 
@@ -31,7 +31,7 @@ BDEPEND="
 	dev-build/gtk-doc-am
 	>=dev-util/intltool-0.35:*
 	sys-devel/gettext:*
-	>=sys-devel/libtool-2.2.6
+	>=dev-build/libtool-2.2.6
 	virtual/pkgconfig:*
 	!<gnome-extra/polkit-gnome-0.102:0
 "
