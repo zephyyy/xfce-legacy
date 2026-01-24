@@ -3,7 +3,7 @@
 
 EAPI=8
 
-inherit git-r3 gnome2-utils autotools
+inherit git-r3 autotools
 
 DESCRIPTION="Font viewer utility for MATE Desktop"
 EGIT_REPO_URI="https://github.com/mate-desktop/mate-control-center.git"
@@ -12,7 +12,7 @@ EGIT_COMMIT="v1.22.0"
 
 LICENSE="GPL-2"
 SLOT="0"
-KEYWORDS="amd64 arm arm64 x86 ~ppc64"
+KEYWORDS="amd64 arm arm64 x86 ppc64"
 
 IUSE="debug"
 
@@ -34,7 +34,7 @@ COMMON_DEPEND="
 	x11-libs/libXext
 	>=x11-libs/libXi-1.5
 	x11-libs/pango
-	media-libs/libcanberra[gtk3]
+	media-libs/libcanberra
 	virtual/libintl
 "
 RDEPEND="
