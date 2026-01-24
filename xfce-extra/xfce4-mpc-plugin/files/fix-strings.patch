@@ -11,7 +11,7 @@ diff --git a/panel-plugin/xfce4-mpc-plugin.c b/panel-plugin/xfce4-mpc-plugin.c
 index 1149e4f..87e2054 100644
 --- a/panel-plugin/xfce4-mpc-plugin.c
 +++ b/panel-plugin/xfce4-mpc-plugin.c
-@@ -533,11 +533,25 @@ format_song_display(mpd_Song* song, GString *str, t_mpc* mpc)
+@@ -439,13 +439,27 @@
     if (0 == str->len)
        g_string_assign(str, mpc->playlist_format);
  
@@ -32,9 +32,12 @@ index 1149e4f..87e2054 100644
 +   if (song->track == NULL)
 +      song->track = g_strdup(_("Unknown Track"));
     str_replace(str, "%track%", song->track);
-+
+-}
+ 
 +   if (song->file == NULL)
 +      song->file = g_strdup(_("Unknown File"));
-    str_replace(str, "%file%", song->file);
- }
- 
++   str_replace(str, "%file%", song->file);
++}
+ static void
+ enter_cb(GtkWidget *widget, GdkEventCrossing* event, t_mpc* mpc)
+ {
