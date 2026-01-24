@@ -1,0 +1,38 @@
+--- a/panel-plugin/verve-plugin.c
++++ b/panel-plugin/verve-plugin.c
+@@ -672,7 +672,7 @@
+   g_return_val_if_fail (verve != NULL, FALSE);
+ 
+   /* Set text in internal label object */
+-  gtk_label_set_text(verve->label, label);
++  gtk_label_set_text (GTK_LABEL (verve->label), label);
+ 
+   return TRUE;
+ }
+@@ -764,7 +764,7 @@
+   gint    size = 20;
+ 
+   /* Default label */
+-  gchar  *label = "";
++  const   gchar  *label = "";
+   
+   /* Default foreground and background colors */
+   gchar  *fg_color_str = "";
+@@ -785,7 +785,7 @@
+   verve->launch_params.use_shell = TRUE;
+ 
+   /* Default search engine URL */
+-  gchar *smartbookmark_url = "";
++  const   gchar  *smartbookmark_url = "";
+ 
+   g_return_if_fail (plugin != NULL);
+   g_return_if_fail (verve != NULL);
+@@ -881,7 +881,7 @@
+       xfce_rc_write_int_entry (rc, "size", verve->size);
+ 
+       /* Write label value */
+-      xfce_rc_write_entry (rc, "label", gtk_label_get_text(verve->label));
++      xfce_rc_write_entry (rc, "label", gtk_label_get_text (GTK_LABEL (verve->label)));
+ 
+       /* Write number of saved history entries */
+       xfce_rc_write_int_entry (rc, "history-length", verve->history_length);
