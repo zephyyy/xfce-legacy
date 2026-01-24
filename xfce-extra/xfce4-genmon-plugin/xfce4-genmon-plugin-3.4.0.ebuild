@@ -7,6 +7,7 @@ inherit xdg-utils
 DESCRIPTION="Cyclically spawned executable output on the panel"
 HOMEPAGE="https://goodies.xfce.org/projects/panel-plugins/xfce4-genmon-plugin"
 SRC_URI="https://archive.xfce.org/src/panel-plugins/${PN}/${PV%.*}/${P}.tar.bz2"
+S="${WORKDIR}/${P%.*}"
 
 LICENSE="LGPL-2.1"
 SLOT="0"
