@@ -1,0 +1,241 @@
+From 71a1227e0cfd8a0d91c8d0c3fe7ea75a3e94a5e7 Mon Sep 17 00:00:00 2001
+From: Flo <flo.xfce@gmx-topmail.de>
+Date: Sun, 26 Apr 2015 11:27:03 +0200
+Subject: [PATCH 1/7] Port from deprecated GValueArray to GArray
+
+---
+ lib/screenshooter-imgur.c      | 16 +++++++-------
+ lib/screenshooter-simple-job.c | 10 ++++-----
+ lib/screenshooter-simple-job.h |  6 +++---
+ lib/screenshooter-zimagez.c    | 38 ++++++++++++++++++++--------------
+ 4 files changed, 39 insertions(+), 31 deletions(-)
+
+diff --git a/lib/screenshooter-imgur.c b/lib/screenshooter-imgur.c
+index e4a5e2a..505f274 100644
+--- a/lib/screenshooter-imgur.c
++++ b/lib/screenshooter-imgur.c
+@@ -26,15 +26,15 @@
+ #include <libxml/parser.h>
+ 
+ static gboolean          imgur_upload_job          (ScreenshooterJob  *job,
+-                                                    GValueArray       *param_values,
++                                                    GArray            *param_values,
+                                                     GError           **error);
+ 
+ static gboolean
+-imgur_upload_job (ScreenshooterJob *job, GValueArray *param_values, GError **error)
++imgur_upload_job (ScreenshooterJob *job, GArray *param_values, GError **error)
+ {
+   const gchar *image_path, *title;
+   gchar *online_file_name = NULL;
+-  gchar* proxy_uri;
++  const gchar* proxy_uri;
+   SoupURI *soup_proxy_uri;
+ #if DEBUG > 0
+   SoupLogger *log;
+@@ -54,9 +54,9 @@ imgur_upload_job (ScreenshooterJob *job, GValueArray *param_values, GError **err
+ 
+   g_return_val_if_fail (SCREENSHOOTER_IS_JOB (job), FALSE);
+   g_return_val_if_fail (param_values != NULL, FALSE);
+-  g_return_val_if_fail (param_values->n_values == 2, FALSE);
+-  g_return_val_if_fail (G_VALUE_HOLDS_STRING (&param_values->values[0]), FALSE);
+-  g_return_val_if_fail (G_VALUE_HOLDS_STRING (&param_values->values[1]), FALSE);
++  g_return_val_if_fail (param_values->len == 2, FALSE);
++  g_return_val_if_fail ((G_VALUE_HOLDS_STRING (&g_array_index(param_values, GValue, 0))), FALSE);
++  g_return_val_if_fail ((G_VALUE_HOLDS_STRING (&g_array_index(param_values, GValue, 1))), FALSE);
+   g_return_val_if_fail (error == NULL || *error == NULL, FALSE);
+ 
+   g_object_set_data (G_OBJECT (job), "jobtype", "imgur");
+@@ -64,8 +64,8 @@ imgur_upload_job (ScreenshooterJob *job, GValueArray *param_values, GError **err
+     return FALSE;
+ 
+ 
+-  image_path = g_value_get_string (g_value_array_get_nth (param_values, 0));
+-  title = g_value_get_string (g_value_array_get_nth (param_values, 1));
++  image_path = g_value_get_string (&g_array_index (param_values, GValue, 0));
++  title = g_value_get_string (&g_array_index (param_values, GValue, 1));
+ 
+   session = soup_session_sync_new ();
+ #if DEBUG > 0
+diff --git a/lib/screenshooter-simple-job.c b/lib/screenshooter-simple-job.c
+index ec0ac32..da06f4d 100644
+--- a/lib/screenshooter-simple-job.c
++++ b/lib/screenshooter-simple-job.c
+@@ -35,7 +35,7 @@ struct _ScreenshooterSimpleJob
+ {
+   ScreenshooterJob            __parent__;
+   ScreenshooterSimpleJobFunc  func;
+-  GValueArray                *param_values;
++  GArray                     *param_values;
+ };
+ 
+ 
+@@ -89,7 +89,7 @@ screenshooter_simple_job_finalize (GObject *object)
+   ScreenshooterSimpleJob *simple_job = SCREENSHOOTER_SIMPLE_JOB (object);
+ 
+   /* release the param values */
+-  g_value_array_free (simple_job->param_values);
++  g_array_unref (simple_job->param_values);
+ 
+   (*G_OBJECT_CLASS (screenshooter_simple_job_parent_class)->finalize) (object);
+ }
+@@ -163,7 +163,7 @@ screenshooter_simple_job_launch (ScreenshooterSimpleJobFunc func,
+   /* allocate and initialize the simple job */
+   simple_job = g_object_new (SCREENSHOOTER_TYPE_SIMPLE_JOB, NULL);
+   simple_job->func = func;
+-  simple_job->param_values = g_value_array_new (n_param_values);
++  simple_job->param_values = g_array_sized_new (FALSE, FALSE, sizeof(GValue), n_param_values);
+ 
+   /* collect the parameters */
+   va_start (var_args, n_param_values);
+@@ -182,7 +182,7 @@ screenshooter_simple_job_launch (ScreenshooterSimpleJobFunc func,
+           g_free (error_message);
+         }
+ 
+-      g_value_array_insert (simple_job->param_values, n, &value);
++      g_array_append_val(simple_job->param_values, value);
+       g_value_unset (&value);
+     }
+   va_end (var_args);
+@@ -193,7 +193,7 @@ screenshooter_simple_job_launch (ScreenshooterSimpleJobFunc func,
+ 
+ 
+ 
+-GValueArray *
++GArray *
+ screenshooter_simple_job_get_param_values (ScreenshooterSimpleJob *job)
+ {
+   g_return_val_if_fail (SCREENSHOOTER_IS_SIMPLE_JOB (job), NULL);
+diff --git a/lib/screenshooter-simple-job.h b/lib/screenshooter-simple-job.h
+index e22e15d..b9cc1bc 100644
+--- a/lib/screenshooter-simple-job.h
++++ b/lib/screenshooter-simple-job.h
+@@ -34,7 +34,7 @@ G_BEGIN_DECLS
+ /**
+  * ScreenshooterSimpleJobFunc:
+  * @job            : a #ScreenshooterJob.
+- * @param_values   : a #GValueArray of the #GValue<!---->s passed to
++ * @param_values   : a #GArray of the #GValue<!---->s passed to
+  *                   screenshooter_simple_job_launch().
+  * @error          : return location for errors.
+  *
+@@ -44,7 +44,7 @@ G_BEGIN_DECLS
+  * Return value: %TRUE on success, %FALSE in case of an error.
+  **/
+ typedef gboolean (*ScreenshooterSimpleJobFunc) (ScreenshooterJob *job,
+-                                                GValueArray      *param_values,
++                                                GArray      *param_values,
+                                                 GError           **error);
+ 
+ 
+@@ -63,7 +63,7 @@ GType             screenshooter_simple_job_get_type         (void) G_GNUC_CONST;
+ ScreenshooterJob *screenshooter_simple_job_launch           (ScreenshooterSimpleJobFunc  func,
+                                                              guint                       n_param_values,
+                                                              ...) G_GNUC_MALLOC G_GNUC_WARN_UNUSED_RESULT;
+-GValueArray      *screenshooter_simple_job_get_param_values (ScreenshooterSimpleJob     *job);
++GArray           *screenshooter_simple_job_get_param_values (ScreenshooterSimpleJob     *job);
+ 
+ G_END_DECLS
+ 
+diff --git a/lib/screenshooter-zimagez.c b/lib/screenshooter-zimagez.c
+index e777f0c..b8e51a4 100644
+--- a/lib/screenshooter-zimagez.c
++++ b/lib/screenshooter-zimagez.c
+@@ -52,7 +52,7 @@ static gboolean          do_xmlrpc                 (SoupSession       *session,
+                                                     ...);
+ static gboolean          has_empty_field           (GtkListStore      *liststore);
+ static gboolean          zimagez_upload_job        (ScreenshooterJob  *job,
+-                                                    GValueArray       *param_values,
++                                                    GArray            *param_values,
+                                                     GError           **error);
+ 
+ 
+@@ -66,20 +66,28 @@ do_xmlrpc (SoupSession *session, const gchar *uri, const gchar *method,
+ {
+   SoupMessage *msg;
+   va_list args;
+-  GValueArray *params;
++  GArray *params = g_array_sized_new(FALSE, FALSE, sizeof(GValue), 1);
+   GError *err = NULL;
+   char *body;
++  GType type;
++  GValue val;
+ 
+   g_return_val_if_fail (error == NULL || *error == NULL, FALSE);
+ 
+   va_start (args, retval);
+-  params = soup_value_array_from_args (args);
++
++  //copy soup_value_array_from_args() in here and change datatypes respectivly
++  while ((type = va_arg (args, GType)) != G_TYPE_INVALID)
++  {
++    SOUP_VALUE_SETV (&val, type, args);
++    g_array_append_val (params, val);
++  }
++
+   va_end (args);
+ 
+-  body =
+-    soup_xmlrpc_build_method_call (method, params->values,
+-                                   params->n_values);
+-  g_value_array_free (params);
++  body = soup_xmlrpc_build_method_call (method, (GValue*)params->data,
++                                   params->len);
++  g_array_unref (params);
+ 
+   if (!body)
+     {
+@@ -171,7 +179,7 @@ has_empty_field (GtkListStore *liststore)
+ 
+ 
+ static gboolean
+-zimagez_upload_job (ScreenshooterJob *job, GValueArray *param_values, GError **error)
++zimagez_upload_job (ScreenshooterJob *job, GArray *param_values, GError **error)
+ {
+   const gchar *encoded_data;
+   const gchar *image_path;
+@@ -206,10 +214,10 @@ zimagez_upload_job (ScreenshooterJob *job, GValueArray *param_values, GError **e
+ 
+   g_return_val_if_fail (SCREENSHOOTER_IS_JOB (job), FALSE);
+   g_return_val_if_fail (param_values != NULL, FALSE);
+-  g_return_val_if_fail (param_values->n_values == 3, FALSE);
+-  g_return_val_if_fail (G_VALUE_HOLDS_STRING (&param_values->values[0]), FALSE);
+-  g_return_val_if_fail (G_VALUE_HOLDS_STRING (&param_values->values[1]), FALSE);
+-  g_return_val_if_fail (G_VALUE_HOLDS_STRING (&param_values->values[2]), FALSE);
++  g_return_val_if_fail (param_values->len == 3, FALSE);
++  g_return_val_if_fail (G_VALUE_HOLDS_STRING (&g_array_index (param_values, GValue, 0)), FALSE);
++  g_return_val_if_fail (G_VALUE_HOLDS_STRING (&g_array_index (param_values, GValue, 1)), FALSE);
++  g_return_val_if_fail (G_VALUE_HOLDS_STRING (&g_array_index (param_values, GValue, 2)), FALSE);
+   g_return_val_if_fail (error == NULL || *error == NULL, FALSE);
+ 
+   g_object_set_data (G_OBJECT (job), "jobtype", "zimagez");
+@@ -222,7 +230,7 @@ zimagez_upload_job (ScreenshooterJob *job, GValueArray *param_values, GError **e
+     }
+ 
+   /* Get the last user */
+-  last_user = g_value_get_string (g_value_array_get_nth (param_values, 1));
++  last_user = g_value_get_string (&g_array_index (param_values, GValue, 1));
+   user = g_strdup (last_user);
+ 
+   if (user == NULL)
+@@ -238,7 +246,7 @@ zimagez_upload_job (ScreenshooterJob *job, GValueArray *param_values, GError **e
+                           g_strdup (user), (GDestroyNotify) g_free);
+ 
+   /* Get the default title */
+-  title = g_strdup (g_value_get_string (g_value_array_get_nth (param_values, 2)));
++  title = g_strdup (g_value_get_string (&g_array_index (param_values, GValue, 2)));
+   if (title == NULL)
+     title = g_strdup ("");
+ 
+@@ -249,7 +257,7 @@ zimagez_upload_job (ScreenshooterJob *job, GValueArray *param_values, GError **e
+     }
+ 
+   /* Get the path of the image that is to be uploaded */
+-  image_path = g_value_get_string (g_value_array_get_nth (param_values, 0));
++  image_path = g_value_get_string (&g_array_index (param_values, GValue, 0));
+ 
+   /* Start the user soup session */
+   exo_job_info_message (EXO_JOB (job), _("Initialize the connection..."));
+-- 
+2.45.2
+

@@ -1,0 +1,30 @@
+From f00a6a568c7f92a627e4d3ecb9bedd027b69840f Mon Sep 17 00:00:00 2001
+From: Matias Wilkman <matias.wilkman@gmail.com>
+Date: Mon, 30 Nov 2015 22:03:49 +0100
+Subject: [PATCH 6/7] activate delay spinner for region mode (bug #12336)
+
+---
+ lib/screenshooter-dialogs.c | 7 -------
+ 1 file changed, 7 deletions(-)
+
+diff --git a/lib/screenshooter-dialogs.c b/lib/screenshooter-dialogs.c
+index f3c2535..3dae978 100644
+--- a/lib/screenshooter-dialogs.c
++++ b/lib/screenshooter-dialogs.c
+@@ -866,13 +866,6 @@ GtkWidget *screenshooter_region_dialog_new (ScreenshotData *sd, gboolean plugin)
+   g_signal_connect (G_OBJECT (delay_spinner), "value-changed",
+                     G_CALLBACK (cb_delay_spinner_changed), sd);
+ 
+-  /* Set the delay box as inactive when we capture rectangles */
+-  g_signal_connect (G_OBJECT (rectangle_button), "toggled",
+-                    G_CALLBACK (cb_toggle_set_insensi), delay_box);
+-
+-  /* Set the default state */
+-  cb_toggle_set_insensi (GTK_TOGGLE_BUTTON (rectangle_button), delay_box);
+-
+   gtk_widget_show_all (GTK_DIALOG (dlg)->vbox);
+ 
+   return dlg;
+-- 
+2.45.2
+

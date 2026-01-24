@@ -1,0 +1,25 @@
+From c77423856daa09abb8b766c3fa2e9e5a6832b06e Mon Sep 17 00:00:00 2001
+From: Matias Wilkman <matias.wilkman@gmail.com>
+Date: Sat, 28 Nov 2015 21:59:29 +0200
+Subject: [PATCH 4/7] fixed gray overlay in region mode screenshots (bug
+ #11922)
+
+---
+ lib/screenshooter-capture.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/lib/screenshooter-capture.c b/lib/screenshooter-capture.c
+index f4e6e92..b5649fe 100644
+--- a/lib/screenshooter-capture.c
++++ b/lib/screenshooter-capture.c
+@@ -748,6 +748,7 @@ static GdkPixbuf
+   gtk_dialog_run (GTK_DIALOG (window));
+   gtk_widget_destroy (window);
+   gdk_cursor_unref (xhair_cursor);
++  gdk_flush();
+ 
+   if (cancelled)
+     return NULL;
+-- 
+2.45.2
+

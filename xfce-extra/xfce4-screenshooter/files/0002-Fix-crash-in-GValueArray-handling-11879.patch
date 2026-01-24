@@ -1,0 +1,92 @@
+From 89d4d55e883bdc0cd6c3cb6660a585b0097483bb Mon Sep 17 00:00:00 2001
+From: Flo <flo.xfce@gmx-topmail.de>
+Date: Mon, 19 Oct 2015 20:38:18 +0200
+Subject: [PATCH 2/7] Fix crash in GValueArray handling (#11879)
+
+---
+ lib/screenshooter-imgur.c      | 11 +++++------
+ lib/screenshooter-simple-job.c | 14 +++++++++++---
+ 2 files changed, 16 insertions(+), 9 deletions(-)
+
+diff --git a/lib/screenshooter-imgur.c b/lib/screenshooter-imgur.c
+index 505f274..adbaf75 100644
+--- a/lib/screenshooter-imgur.c
++++ b/lib/screenshooter-imgur.c
+@@ -55,17 +55,16 @@ imgur_upload_job (ScreenshooterJob *job, GArray *param_values, GError **error)
+   g_return_val_if_fail (SCREENSHOOTER_IS_JOB (job), FALSE);
+   g_return_val_if_fail (param_values != NULL, FALSE);
+   g_return_val_if_fail (param_values->len == 2, FALSE);
+-  g_return_val_if_fail ((G_VALUE_HOLDS_STRING (&g_array_index(param_values, GValue, 0))), FALSE);
+-  g_return_val_if_fail ((G_VALUE_HOLDS_STRING (&g_array_index(param_values, GValue, 1))), FALSE);
++  g_return_val_if_fail ((G_VALUE_HOLDS_STRING (g_array_index(param_values, GValue*, 0))), FALSE);
++  g_return_val_if_fail ((G_VALUE_HOLDS_STRING (g_array_index(param_values, GValue*, 1))), FALSE);
+   g_return_val_if_fail (error == NULL || *error == NULL, FALSE);
+ 
+   g_object_set_data (G_OBJECT (job), "jobtype", "imgur");
+   if (exo_job_set_error_if_cancelled (EXO_JOB (job), error))
+     return FALSE;
+ 
+-
+-  image_path = g_value_get_string (&g_array_index (param_values, GValue, 0));
+-  title = g_value_get_string (&g_array_index (param_values, GValue, 1));
++  image_path = g_value_get_string (g_array_index (param_values, GValue*, 0));
++  title = g_value_get_string (g_array_index (param_values, GValue*, 1));
+ 
+   session = soup_session_sync_new ();
+ #if DEBUG > 0
+@@ -129,7 +128,7 @@ imgur_upload_job (ScreenshooterJob *job, GArray *param_values, GError **error)
+   root_node = xmlDocGetRootElement(doc);
+   for (child_node = root_node->children; child_node; child_node = child_node->next)
+     if (xmlStrEqual(child_node->name, (const xmlChar *) "id"))
+-       online_file_name = xmlNodeGetContent(child_node);
++       online_file_name = (gchar*)xmlNodeGetContent(child_node);
+   TRACE("found picture id %s\n", online_file_name);
+   xmlFreeDoc(doc);
+   soup_buffer_free (buf);
+diff --git a/lib/screenshooter-simple-job.c b/lib/screenshooter-simple-job.c
+index da06f4d..4b21bea 100644
+--- a/lib/screenshooter-simple-job.c
++++ b/lib/screenshooter-simple-job.c
+@@ -157,20 +157,24 @@ screenshooter_simple_job_launch (ScreenshooterSimpleJobFunc func,
+   ScreenshooterSimpleJob *simple_job;
+   va_list var_args;
+   GValue value = { 0, };
++  GValue *copy;
+   gchar *error_message;
+   guint n;
++  GType type;
+ 
+   /* allocate and initialize the simple job */
+   simple_job = g_object_new (SCREENSHOOTER_TYPE_SIMPLE_JOB, NULL);
+   simple_job->func = func;
+-  simple_job->param_values = g_array_sized_new (FALSE, FALSE, sizeof(GValue), n_param_values);
++  simple_job->param_values = g_array_sized_new (FALSE, FALSE, sizeof(GValue*), n_param_values);
++  g_array_set_clear_func (simple_job->param_values, (GDestroyNotify) g_free);
+ 
+   /* collect the parameters */
+   va_start (var_args, n_param_values);
+   for (n = 0; n < n_param_values; ++n)
+     {
+       /* initialize the value to hold the next parameter */
+-      g_value_init (&value, va_arg (var_args, GType));
++      type = va_arg (var_args, GType);
++      g_value_init (&value, type);
+ 
+       /* collect the value from the stack */
+       G_VALUE_COLLECT (&value, var_args, 0, &error_message);
+@@ -182,7 +186,11 @@ screenshooter_simple_job_launch (ScreenshooterSimpleJobFunc func,
+           g_free (error_message);
+         }
+ 
+-      g_array_append_val(simple_job->param_values, value);
++      // GArray only takes references, so we allocate extra memory. this will be freed wenn the array is freed
++      copy = g_new0(GValue,1);
++      g_value_init(copy, type);
++      g_value_copy(&value,copy);
++      g_array_insert_val(simple_job->param_values,n,copy);
+       g_value_unset (&value);
+     }
+   va_end (var_args);
+-- 
+2.45.2
+

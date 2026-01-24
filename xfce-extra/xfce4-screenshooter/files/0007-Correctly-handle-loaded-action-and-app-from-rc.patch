@@ -1,0 +1,47 @@
+From a034ba490d6af8836084f0636a39276892b586e0 Mon Sep 17 00:00:00 2001
+From: Andre Miranda <andreldm@xfce.org>
+Date: Tue, 26 Sep 2017 22:16:42 -0300
+Subject: [PATCH 7/7] Correctly handle loaded action and app from rc
+
+These options were until then ignored when using
+the window, region or fullscreen options from CLI.
+---
+ src/main.c | 15 ++++++++-------
+ 1 file changed, 8 insertions(+), 7 deletions(-)
+
+diff --git a/src/main.c b/src/main.c
+index c677165..8267913 100644
+--- a/src/main.c
++++ b/src/main.c
+@@ -36,8 +36,8 @@ gboolean mouse = FALSE;
+ gboolean upload = FALSE;
+ gboolean clipboard = FALSE;
+ gboolean upload_imgur = FALSE;
+-gchar *screenshot_dir;
+-gchar *application;
++gchar *screenshot_dir = NULL;
++gchar *application = NULL;
+ gint delay = 0;
+ 
+ 
+@@ -337,11 +337,12 @@ int main (int argc, char **argv)
+           sd->action = UPLOAD_IMGUR;
+           sd->action_specified = TRUE;
+         }
+-      else
+-        {
+-          sd->app = g_strdup ("none");
+-          sd->action = SAVE;
+-        }
++
++      if (!sd->app)
++        sd->app = g_strdup ("none");
++
++      if (!sd->action)
++        sd->action = SAVE;
+ 
+       /* If the user gave a directory name, check that it is valid */
+       if (screenshot_dir != NULL)
+-- 
+2.45.2
+

@@ -16,7 +16,7 @@ IUSE=""
 
 RDEPEND="
 	>=dev-libs/glib-2.16:=
-	>=net-libs/libsoup-2.26:=
+	>=net-libs/libsoup-2.26:2.4=
 	>=x11-libs/gdk-pixbuf-2.16:=
 	>=x11-libs/gtk+-2.16:2=
 	dev-libs/libxml2:=
@@ -35,7 +35,14 @@ BDEPEND="
 "
 
 PATCHES=(
-	"${FILESDIR}/0001-Allow-and-remember-0sec-delay.patch"
+	"${FILESDIR}/0001-Port-from-deprecated-GValueArray-to-GArray.patch"
+	"${FILESDIR}/0002-Fix-crash-in-GValueArray-handling-11879.patch"
+	"${FILESDIR}/0003-Makefile.am-create-ouput-directory-for-desktop-file.patch"
+	"${FILESDIR}/0004-fixed-gray-overlay-in-region-mode-screenshots-bug-11.patch"
+	"${FILESDIR}/0005-enable-delay-in-region-mode.patch"
+	"${FILESDIR}/0006-activate-delay-spinner-for-region-mode-bug-12336.patch"
+	"${FILESDIR}/0007-Correctly-handle-loaded-action-and-app-from-rc.patch"
+	"${FILESDIR}/0008-Allow-and-remember-0sec-delay.patch"
 )
 
 src_prepare() {
