@@ -1,0 +1,115 @@
+From 4ba059396efe125fd725beaa47630ddd864f96fb Mon Sep 17 00:00:00 2001
+From: Fabian <timystery@arcor.de>
+Date: Tue, 11 Sep 2018 22:34:13 +0200
+Subject: [PATCH] applied patch from bug 14551
+
+---
+ include/types.h                |  2 ++
+ lib/lmsensors.c                | 47 ++++++++++++++++++++++++++++++++++
+ lib/sensors-interface-common.c |  8 ++++++
+ 3 files changed, 57 insertions(+)
+
+diff --git a/include/types.h b/include/types.h
+index 51ee915..c1d3895 100644
+--- a/include/types.h
++++ b/include/types.h
+@@ -74,6 +74,8 @@ typedef enum {
+     SPEED,
+     ENERGY,
+     STATE,
++    POWER,
++    CURRENT,
+     OTHER
+ } t_chipfeature_class;
+ 
+diff --git a/lib/lmsensors.c b/lib/lmsensors.c
+index 90ddc5a..ee02035 100644
+--- a/lib/lmsensors.c
++++ b/lib/lmsensors.c
+@@ -181,6 +181,41 @@ categorize_sensor_type_libsensors4 (t_chipfeature *chipfeature,
+                 chipfeature->max_value = sensorFeature;
+             break;
+ 
++        case SENSORS_FEATURE_POWER:
++            chipfeature->class = POWER;
++            chipfeature->min_value = 0.0;
++            chipfeature->max_value = 120.0;
++             
++            if ((sub_feature = sensors_get_subfeature (name, feature,
++                    SENSORS_SUBFEATURE_POWER_MAX)) &&
++                    !sensors_get_value (name, sub_feature->number, &sensorFeature))
++                chipfeature->max_value = sensorFeature;
++
++            break;
++
++        case SENSORS_FEATURE_ENERGY:
++	    chipfeature->class = ENERGY;
++            chipfeature->min_value = 0.0;
++            chipfeature->max_value = 120.0;
++	    break;
++
++        case SENSORS_FEATURE_CURR:
++	    chipfeature->class = CURRENT;
++            chipfeature->min_value = 0.0;
++            chipfeature->max_value = 100.0;
++
++            if ((sub_feature = sensors_get_subfeature (name, feature,
++                    SENSORS_SUBFEATURE_CURR_MIN)) &&
++                    !sensors_get_value (name, sub_feature->number, &sensorFeature))
++                chipfeature->min_value = sensorFeature;
++
++            if ((sub_feature = sensors_get_subfeature (name, feature,
++                    SENSORS_SUBFEATURE_CURR_MAX)) &&
++                    !sensors_get_value (name, sub_feature->number, &sensorFeature))
++                chipfeature->max_value = sensorFeature;
++
++	    break;
++
+         case SENSORS_FEATURE_VID:
+             chipfeature->class = VOLTAGE;
+             chipfeature->min_value = 1.0;
+@@ -308,6 +343,18 @@ t_chipfeature *find_chipfeature (const sensors_chip_name *name, t_chip *chip,
+             sub_feature = sensors_get_subfeature (name, feature,
+                                                  SENSORS_SUBFEATURE_BEEP_ENABLE);
+             break;
++        case SENSORS_FEATURE_POWER:
++            sub_feature = sensors_get_subfeature (name, feature,
++                                                 SENSORS_SUBFEATURE_POWER_INPUT);
++            break;
++        case SENSORS_FEATURE_ENERGY:
++            sub_feature = sensors_get_subfeature (name, feature,
++                                                 SENSORS_SUBFEATURE_ENERGY_INPUT);
++            break;
++        case SENSORS_FEATURE_CURR:
++            sub_feature = sensors_get_subfeature (name, feature,
++                                                 SENSORS_SUBFEATURE_CURR_INPUT);
++            break;
+         default:
+             sub_feature = sensors_get_subfeature (name, feature,
+                                                   SENSORS_SUBFEATURE_UNKNOWN);
+diff --git a/lib/sensors-interface-common.c b/lib/sensors-interface-common.c
+index efd376e..6e326eb 100644
+--- a/lib/sensors-interface-common.c
++++ b/lib/sensors-interface-common.c
+@@ -153,10 +153,18 @@ format_sensor_value (t_tempscale scale, t_chipfeature *chipfeature,
+                *help = g_strdup_printf(_("%+.3f V"), sensorFeature);
+                break;
+ 
++        case CURRENT:
++               *help = g_strdup_printf(_("%+.3f A"), sensorFeature);
++               break;
++
+         case ENERGY:
+                *help = g_strdup_printf(_("%.0f mWh"), sensorFeature);
+                break;
+ 
++        case POWER:
++               *help = g_strdup_printf(_("%.0f W"), sensorFeature);
++               break;
++
+         case STATE:
+                 if (sensorFeature==0.0)
+                     *help = g_strdup (_("off"));
+-- 
+2.45.2
+

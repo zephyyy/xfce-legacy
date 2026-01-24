@@ -31,6 +31,10 @@ BDEPEND="
 	virtual/pkgconfig
 "
 
+PATCHES=(
+	"${FILESDIR}/0001-applied-patch-from-bug-14551.patch"
+)
+
 DOCS=( AUTHORS ChangeLog NEWS NOTES README TODO )
 
 src_prepare() {
