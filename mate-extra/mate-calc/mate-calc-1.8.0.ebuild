@@ -3,7 +3,7 @@
 
 EAPI=8
 
-inherit xdg-utils
+inherit xdg-utils gnome2-utils
 
 DESCRIPTION="A calculator application for MATE"
 HOMEPAGE="https://mate-desktop.org"
@@ -12,6 +12,7 @@ SRC_URI="https://pub.mate-desktop.org/releases/${PV%.*}/${P}.tar.xz"
 LICENSE="GPL-2"
 SLOT="0"
 KEYWORDS="amd64 arm arm64 x86 ppc64"
+IUSE="gtk3"
 
 RDEPEND="
 	>=dev-libs/glib-2.30:2
@@ -28,13 +29,15 @@ BDEPEND="
 "
 
 src_configure() {
-	econf --with-gtk=2.0
+	econf --with-gtk=$(usex gtk3 3.0 2.0)
 }
 
 pkg_postinst() {
 	xdg_icon_cache_update
+	gnome2_schemas_update
 }
 
 pkg_postrm() {
 	xdg_icon_cache_update
+	gnome2_schemas_update
 }
