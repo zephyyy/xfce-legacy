@@ -28,6 +28,12 @@ PATCHES=(
 	"${FILESDIR}/backport-2.6.3-changes.patch"
 )
 
+src_prepare() {
+	default
+	mkdir m4
+	NOCONFIGURE=1 xdt-autogen
+}
+
 src_install() {
 	default
 	find "${D}" -name '*.la' -delete || die
