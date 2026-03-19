@@ -8,6 +8,6 @@ Apart from a few exceptions, contains only the ebuilds and patches necessary for
 
 ## TODO
 
-* xfce4-weather-plugin gtk2 patches
-* More gcc14+ patches (`incompatible-pointer-types` and friends)
+* ~~xfce4-weather-plugin gtk2 patches~~
+* ~~More gcc14+ patches (`incompatible-pointer-types` and friends)~~
 * perhaps a better README?
