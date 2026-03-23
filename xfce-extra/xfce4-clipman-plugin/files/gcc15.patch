@@ -1,0 +1,27 @@
+--- a/panel-plugin/main-status-icon.c
++++ b/panel-plugin/main-status-icon.c
+@@ -35,7 +35,7 @@
+  * Status Icon
+  */
+ 
+-static MyPlugin*        status_icon_register            ();
++static MyPlugin*        status_icon_register            (void);
+ static gboolean         cb_status_icon_is_embedded      (GtkStatusIcon *status_icon);
+ static void             cb_status_icon_activate         (MyPlugin *plugin);
+ static void             cb_status_icon_popup_menu       (MyPlugin *plugin,
+@@ -43,8 +43,8 @@
+                                                          guint activate_time);
+ static void             cb_status_icon_quit             (MyPlugin *plugin);
+ static void             cb_status_icon_finalize         (MyPlugin *plugin);
+-static void             install_autostart_file          ();
+-static void             update_autostart_file           ();
++static void             install_autostart_file          (void);
++static void             update_autostart_file           (gboolean autostart);
+ 
+ /*
+  * Plugin Registration
+@@ -236,4 +236,3 @@
+   g_key_file_free (keyfile);
+   g_free (userfile);
+ }
+-

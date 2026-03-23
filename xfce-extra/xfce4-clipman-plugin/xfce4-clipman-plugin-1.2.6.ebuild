@@ -35,6 +35,10 @@ BDEPEND="
 	x11-base/xorg-proto
 "
 
+PATCHES=(
+	"${FILESDIR}"/gcc15.patch
+)
+
 src_prepare() {
 	default
 	sed -i data/appdata/Makefile.* -e 's,/appdata,/metainfo,'
