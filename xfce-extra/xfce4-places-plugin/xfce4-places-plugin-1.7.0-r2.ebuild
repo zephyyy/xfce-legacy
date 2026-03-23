@@ -27,6 +27,10 @@ BDEPEND="
 	sys-devel/gettext
 	virtual/pkgconfig"
 
+PATCHES=(
+	"${FILESDIR}"/gcc15.patch
+)
+
 src_configure() {
 	local myconf=(
 		$(use_enable libnotify notifications)
