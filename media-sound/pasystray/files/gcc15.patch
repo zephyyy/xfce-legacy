@@ -1,0 +1,309 @@
+From 9883809c7956471cf085ae90af4a9831c1234417 Mon Sep 17 00:00:00 2001
+From: Yaakov Selkowitz <yselkowi@redhat.com>
+Date: Mon, 20 Jan 2025 14:21:24 -0500
+Subject: [PATCH] Fix build with GCC 15
+
+C23 changes the implication of a function declaration without arguments
+from an undetermined number and type to `void` (no arguments).  While that
+is true in most of the cases here, init() and destroy() actually take a
+settings_t*.  This defines the arguments (or lack thereof) of all
+functions, avoiding any ambiguity.
+
+https://gcc.gnu.org/gcc-15/porting_to.html
+---
+ src/avahi.c        | 2 +-
+ src/avahi.h        | 2 +-
+ src/menu_info.c    | 2 +-
+ src/menu_info.h    | 2 +-
+ src/notify.c       | 4 ++--
+ src/notify.h       | 2 +-
+ src/options.c      | 2 +-
+ src/options.h      | 2 +-
+ src/pasystray.c    | 2 +-
+ src/pasystray.h    | 8 +++++---
+ src/pulseaudio.c   | 2 +-
+ src/pulseaudio.h   | 3 +--
+ src/systray.c      | 2 +-
+ src/systray.h      | 2 +-
+ src/ui.c           | 6 +++---
+ src/ui.h           | 6 +++---
+ src/x11-property.c | 4 ++--
+ src/x11-property.h | 2 +-
+ 18 files changed, 28 insertions(+), 27 deletions(-)
+
+diff --git a/src/avahi.c b/src/avahi.c
+index 9b42cd1..79e7bf1 100644
+--- a/src/avahi.c
++++ b/src/avahi.c
+@@ -107,7 +107,7 @@ void avahi_start(menu_infos_t* mis)
+                 avahi_strerror(avahi_client_errno(client)));
+ }
+ 
+-void avahi_destroy()
++void avahi_destroy(void)
+ {
+     if(sb)
+         avahi_service_browser_free(sb);
+diff --git a/src/avahi.h b/src/avahi.h
+index 50bc573..0fc784c 100644
+--- a/src/avahi.h
++++ b/src/avahi.h
+@@ -28,6 +28,6 @@
+ 
+ void avahi_init(GMainLoop* loop);
+ void avahi_start(menu_infos_t* mis);
+-void avahi_destroy();
++void avahi_destroy(void);
+ 
+ #endif /* PASYSTRAY_AVAHI_H */
+diff --git a/src/menu_info.c b/src/menu_info.c
+index 5142dd9..ea9d9b9 100644
+--- a/src/menu_info.c
++++ b/src/menu_info.c
+@@ -28,7 +28,7 @@
+ #include "ui.h"
+ #include "x11-property.h"
+ 
+-menu_infos_t* menu_infos_create()
++menu_infos_t* menu_infos_create(void)
+ {
+     menu_infos_t* mis = g_new(menu_infos_t, 1);
+ 
+diff --git a/src/menu_info.h b/src/menu_info.h
+index abd3f25..20128d4 100644
+--- a/src/menu_info.h
++++ b/src/menu_info.h
+@@ -100,7 +100,7 @@ struct menu_info_item_t_ {
+     GtkMenuShell* context;
+ };
+ 
+-menu_infos_t* menu_infos_create();
++menu_infos_t* menu_infos_create(void);
+ void menu_infos_init(menu_infos_t* mis);
+ void menu_infos_clear(menu_infos_t* mis);
+ void menu_infos_destroy(menu_infos_t* mis);
+diff --git a/src/notify.c b/src/notify.c
+index c20295f..dc32f73 100644
+--- a/src/notify.c
++++ b/src/notify.c
+@@ -25,7 +25,7 @@
+ 
+ #include "notify.h"
+ 
+-void notify_initialize(){}
++void notify_initialize(void){}
+ notify_handle_t notify(const char* msg, const char* body, const char* icon, gint value){ return 0; }
+ void notify_update(notify_handle_t h, const char* msg, const char* body, const char* icon, gint value){}
+ 
+@@ -34,7 +34,7 @@ void notify_update(notify_handle_t h, const char* msg, const char* body, const c
+ #include <libnotify/notify.h>
+ typedef struct NotifyNotification* notify_handle_t;
+ 
+-void notify_initialize()
++void notify_initialize(void)
+ {
+     notify_init(PACKAGE_NAME);
+ }
+diff --git a/src/notify.h b/src/notify.h
+index 3749bda..c40c9a6 100644
+--- a/src/notify.h
++++ b/src/notify.h
+@@ -28,7 +28,7 @@
+ 
+ typedef void* notify_handle_t;
+ 
+-void notify_initialize();
++void notify_initialize(void);
+ notify_handle_t notify(const char* msg, const char* body, const char* icon, gint value);
+ void notify_update(notify_handle_t h, const char* msg, const char* body, const char* icon, gint value);
+ 
+diff --git a/src/options.c b/src/options.c
+index 0566123..86bb836 100644
+--- a/src/options.c
++++ b/src/options.c
+@@ -62,7 +62,7 @@ static GOptionEntry entries[] =
+     { .long_name = NULL }
+ };
+ 
+-GOptionEntry* get_options()
++GOptionEntry* get_options(void)
+ {
+     return entries;
+ }
+diff --git a/src/options.h b/src/options.h
+index 640eafd..104a1ff 100644
+--- a/src/options.h
++++ b/src/options.h
+@@ -24,7 +24,7 @@
+ 
+ #include "menu_info.h"
+ 
+-GOptionEntry* get_options();
++GOptionEntry* get_options(void);
+ void parse_options(settings_t* settings);
+ 
+ #endif /* PASYSTRAY_OPTIONS_H */
+diff --git a/src/pasystray.c b/src/pasystray.c
+index 5f7d592..232ff96 100644
+--- a/src/pasystray.c
++++ b/src/pasystray.c
+@@ -81,7 +81,7 @@ void init(settings_t* settings)
+ #endif
+ }
+ 
+-void quit()
++void quit(void)
+ {
+     g_main_loop_quit(loop);
+ }
+diff --git a/src/pasystray.h b/src/pasystray.h
+index e131b8d..ce90847 100644
+--- a/src/pasystray.h
++++ b/src/pasystray.h
+@@ -22,8 +22,10 @@
+ #ifndef PASYSTRAY_PASYSTRAY_H
+ #define PASYSTRAY_PASYSTRAY_H
+ 
+-void init();
+-void quit();
+-void destroy();
++#include "menu_info.h"
++
++void init(settings_t* settings);
++void quit(void);
++void destroy(settings_t* settings);
+ 
+ #endif /* PASYSTRAY_PASYSTRAY_H */
+diff --git a/src/pulseaudio.c b/src/pulseaudio.c
+index 8abfd9a..fcdd773 100644
+--- a/src/pulseaudio.c
++++ b/src/pulseaudio.c
+@@ -40,7 +40,7 @@ void pulseaudio_init(menu_infos_t* mis)
+     pulseaudio_connect(mis);
+ }
+ 
+-void pulseaudio_destroy()
++void pulseaudio_destroy(void)
+ {
+     pulseaudio_quit(NULL);
+ }
+diff --git a/src/pulseaudio.h b/src/pulseaudio.h
+index c899df7..6aa3f03 100644
+--- a/src/pulseaudio.h
++++ b/src/pulseaudio.h
+@@ -27,11 +27,10 @@
+ #include "menu_info.h"
+ 
+ void pulseaudio_init(menu_infos_t* mis);
+-void pulseaudio_destroy();
++void pulseaudio_destroy(void);
+ void pulseaudio_prepare_context(menu_infos_t* mis);
+ void pulseaudio_connect(menu_infos_t* mis);
+ void pulseaudio_reconnect(menu_infos_t* mis);
+-void pulseaudio_start();
+ 
+ void pulseaudio_context_state_cb(pa_context* c, void* userdata);
+ 
+diff --git a/src/systray.c b/src/systray.c
+index e27cdac..791c5d9 100644
+--- a/src/systray.c
++++ b/src/systray.c
+@@ -328,7 +328,7 @@ void systray_remove_item_from_all_submenus(menu_info_item_t* item, menu_info_t*
+         menu_info_item_remove(mii->submenu, item->index);
+ }
+ 
+-void systray_about_dialog()
++void systray_about_dialog(void)
+ {
+     char *authors[] = { _("Christoph Gysin <christoph.gysin@gmail.com>"),
+                         NULL };
+diff --git a/src/systray.h b/src/systray.h
+index b9b2def..dd9ae5a 100644
+--- a/src/systray.h
++++ b/src/systray.h
+@@ -57,7 +57,7 @@ void systray_add_item_to_all_submenus(menu_info_item_t* item, menu_info_t* subme
+ void systray_update_item_in_all_submenus(menu_info_item_t* item, menu_info_t* submenu);
+ void systray_remove_item_from_all_submenus(menu_info_item_t* item, menu_info_t* submenu);
+ 
+-void systray_about_dialog();
++void systray_about_dialog(void);
+ 
+ void systray_click_cb(GtkStatusIcon* icon, GdkEventButton* ev, gpointer userdata);
+ void systray_scroll_cb(guint state, GdkScrollDirection direction, menu_infos_t* mis);
+diff --git a/src/ui.c b/src/ui.c
+index 9ac6ad3..32ac9b5 100644
+--- a/src/ui.c
++++ b/src/ui.c
+@@ -123,17 +123,17 @@ void ui_update_systray_icon(menu_info_item_t* mii)
+     systray_impl_set_icon(mis->systray, mii->icon);
+ }
+ 
+-GtkDialog* ui_renamedialog()
++GtkDialog* ui_renamedialog(void)
+ {
+     return (GtkDialog*) gtk_builder_get_object(builder, "renamedialog");
+ }
+ 
+-GtkLabel* ui_renamedialog_label()
++GtkLabel* ui_renamedialog_label(void)
+ {
+     return (GtkLabel*) gtk_builder_get_object(builder, "label");
+ }
+ 
+-GtkEntry* ui_renamedialog_entry()
++GtkEntry* ui_renamedialog_entry(void)
+ {
+     return (GtkEntry*) gtk_builder_get_object(builder, "entry");
+ }
+diff --git a/src/ui.h b/src/ui.h
+index 017ebbe..31e6fdb 100644
+--- a/src/ui.h
++++ b/src/ui.h
+@@ -28,9 +28,9 @@
+ void ui_load(settings_t* settings);
+ void ui_set_volume_icon(menu_info_item_t* mii);
+ void ui_update_systray_icon(menu_info_item_t* mii);
+-GtkDialog* ui_renamedialog();
+-GtkLabel* ui_renamedialog_label();
+-GtkEntry* ui_renamedialog_entry();
++GtkDialog* ui_renamedialog(void);
++GtkLabel* ui_renamedialog_label(void);
++GtkEntry* ui_renamedialog_entry(void);
+ GtkDialog* ui_errordialog(const gchar* title, const gchar* message);
+ 
+ #endif /* PASYSTRAY_UI_H */
+diff --git a/src/x11-property.c b/src/x11-property.c
+index 3e17c1c..02181ba 100644
+--- a/src/x11-property.c
++++ b/src/x11-property.c
+@@ -25,7 +25,7 @@
+ 
+ #include <stdlib.h>
+ 
+-void x11_property_init(){}
++void x11_property_init(void){}
+ void x11_property_set(const char* key, const char* value){}
+ void x11_property_del(const char* key){}
+ char* x11_property_get(const char* key){ return NULL; }
+@@ -40,7 +40,7 @@ char* x11_property_get(const char* key){ return NULL; }
+ static Display* display = NULL;
+ static Window window;
+ 
+-void x11_property_init()
++void x11_property_init(void)
+ {
+     display = gdk_x11_get_default_xdisplay();
+     window = RootWindow(display, 0);
+diff --git a/src/x11-property.h b/src/x11-property.h
+index 012350c..99a0a9a 100644
+--- a/src/x11-property.h
++++ b/src/x11-property.h
+@@ -22,7 +22,7 @@
+ #ifndef PASYSTRAY_X11_PROPERTY_H
+ #define PASYSTRAY_X11_PROPERTY_H
+ 
+-void x11_property_init();
++void x11_property_init(void);
+ void x11_property_set(const char* key, const char* value);
+ void x11_property_del(const char* key);
+ char* x11_property_get(const char* key);

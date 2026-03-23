@@ -31,6 +31,10 @@ BDEPEND="
 	virtual/pkgconfig
 "
 
+PATCHES=(
+	"${FILESDIR}"/gcc15.patch
+)
+
 src_prepare() {
 	default
 	eautoreconf
