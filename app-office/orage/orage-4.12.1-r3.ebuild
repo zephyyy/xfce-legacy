@@ -32,6 +32,7 @@ BDEPEND="
 PATCHES=(
 	"${FILESDIR}"/0001-fix-build-with-libical-version-3.patch
 	"${FILESDIR}"/gcc14.patch
+	"${FILESDIR}"/gcc15.patch
 )
 
 src_configure() {
