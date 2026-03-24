@@ -28,7 +28,7 @@ RDEPEND="
 	>=xfce-base/libxfce4ui-4.11
 	>=xfce-base/libxfce4util-4.11
 	>=xfce-base/xfconf-4.13
-	libcanberra? ( >=media-libs/libcanberra-0.25[sound] )
+	libcanberra? ( >=media-libs/libcanberra-0.25 )
 	input_devices_libinput? ( x11-drivers/xf86-input-libinput )
 	libnotify? ( >=x11-libs/libnotify-0.7 )
 	xklavier? ( >=x11-libs/libxklavier-5 )
